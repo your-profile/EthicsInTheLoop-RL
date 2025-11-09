@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     # Connect to Supermarket
     HOST = '127.0.0.1'
-    PORT = 9000
+    PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
 

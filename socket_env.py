@@ -216,7 +216,7 @@ if __name__ == "__main__":
         '--port',
         type=int,
         help="Which port to bind",
-        default=9000
+        default=1972
     )
 
     parser.add_argument(

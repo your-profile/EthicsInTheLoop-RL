@@ -26,7 +26,7 @@ if __name__ == "__main__":
     
     # Connect to Supermarket
     HOST = '127.0.0.1'
-    PORT = 9000
+    PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
 
@@ -44,9 +44,12 @@ if __name__ == "__main__":
             action = "0 " + action_commands[action_index]
 
             print("Sending action: ", action)
-            sock_game.send(str.encode(action))  # send action to env
-
             next_state = recv_socket_data(sock_game)  # get observation from env
+            
+            if (((state['observation']['players'][0]['direction']) != (action_index - 1))): 
+                sock_game.send(str.encode(action))  # send action to env
+                next_state = recv_socket_data(sock_game)  # get observation from env
+            
             next_state = json.loads(next_state)
 
             # Update state

@@ -12,7 +12,6 @@ from Q_Learning_agent import QLAgent  # Make sure to import your QLAgent class
 import pickle
 import pandas as pd
 
-
 cart = False
 exit_pos = [-0.8, 15.6] # The position of the exit in the environment from [-0.8, 15.6] in x, and y = 15.6
 cart_pos_left = [1, 18.5] # The position of the cart in the environment from [1, 2] in x, and y = 18.5
@@ -32,9 +31,16 @@ def euclidean_distance(pos1, pos2):
 
 
 def calculate_reward(previous_state, current_state):
-    # design your own reward function here
-    # You should design a function to calculate the reward for the agent to guide the agent to do the desired task
-    pass
+    return 0
+
+
+def read_demos(demo_filename=None):
+
+    file = open('./data/{}.pickle'.format(demo_filename), 'rb')
+    demo_dict = pickle.load(file)
+    file.close()
+
+    return demo_dict
 
 if __name__ == "__main__":
     
@@ -55,24 +61,36 @@ if __name__ == "__main__":
     PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
+    pid = input("Input the Participant ID: ")
+    pid = f"{pid}_Demonstration"
+    
+    training_time = 2
+    episode_length = 100
 
-    training_time = 100
-    episode_length = 1000
-    for i in range(training_time):
+    demonstration_dict = read_demos(pid)
+
+    for i in demonstration_dict.keys():
+        print(i)
         sock_game.send(str.encode("0 RESET"))  # reset the game
         state = recv_socket_data(sock_game)
         state = json.loads(state)
         cnt = 0
-        while not state['gameOver']:
+
+        episode_dict = demonstration_dict[0]
+        print(episode_dict["actions"])
+
+        for step in range(demonstration_dict[i]["steps"]):
             cnt += 1
             # Choose an action based on the current state
-            action_index = agent.choose_action(state)
+            action_index = demonstration_dict[i]["actions"][step]
+            print("Chosen Action: ", action_index)
             action = "0 " + action_commands[action_index]
 
             print("Sending action: ", action)
+            sock_game.send(str.encode(action))  # send action to env
             next_state = recv_socket_data(sock_game)  # get observation from env
             
-            if (((state['observation']['players'][0]['direction']) != (action_index - 1))): 
+            if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
                 sock_game.send(str.encode(action))  # send action to env
                 next_state = recv_socket_data(sock_game)  # get observation from env
             
@@ -84,16 +102,17 @@ if __name__ == "__main__":
             print(reward, action_commands[action_index])
             print("------------------------------------------")
             # Update Q-table
-            agent.learning(action_index, reward, state, next_state)
-
-            # Update state
+            agent.learning(action_index, reward, agent.trans(state), agent.trans(next_state))
             state = next_state
+
             agent.qtable.to_json('qtable.json')
 
             if cnt > episode_length:
                 break
+
+        print(cnt)
+
         # Additional code for end of episode if needed
 
-    # Close socket connection
     sock_game.close()
 

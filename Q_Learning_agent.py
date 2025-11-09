@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn.functional as F
-import json  # Import json for dictionary serialization
+# import torch.nn.functional as F
+# import json  # Import json for dictionary serialization
 
 class QLAgent:
     # here are some default parameters, you can use different ones
@@ -13,17 +12,39 @@ class QLAgent:
         self.epsilon = epsilon           # exploit vs. explore probability
         self.mini_epsilon = mini_epsilon # threshold for stopping the decay
         self.decay = decay               # value to decay the epsilon over time
-        self.qtable = pd.DataFrame(columns=[i for i in range(self.action_space)])  # generate the initial table
+        self.qtable = pd.DataFrame(np.random.rand(8000, 7), columns=[i for i in range(self.action_space)])
+
     
-    def trans(self, state, granularity=0.5):
+    def trans(self, state, granularity=1.0):
         # You should design a function to transform the huge state into a learnable state for the agent
         # It should be simple but also contains enough information for the agent to learn
+        player_x = int(state['observation']['players'][0]['position'][0]*granularity)
+        player_y = int(state['observation']['players'][0]['position'][1]*granularity)
+        carts_has = int(len(state['observation']['carts']))
+
+        if carts_has >= 2:
+            carts_has = 2
+
+        height = int(25 * granularity)
+        width = int(20 * granularity)
         
-        pass
+        state_num = (player_x*width + player_y)*height + carts_has
+
+        return state_num
+        
         
     def learning(self, action, rwd, state, next_state):
-        # implement the Q-learning function
+        self.qtable.loc[state, action] = self.qtable.loc[state, action] + self.alpha * (rwd + self.gamma * np.max(self.qtable.loc[next_state]) - self.qtable.loc[state, action]
+    )
+
+        
 
     def choose_action(self, state):
-        # implement the action selection for the fully trained agent
-       
+        rand = np.random.rand()
+
+        if rand < self.epsilon:
+            action = np.random.choice(range(self.action_space))#, p = [0.18, 0.18, 0.18, 0.18, 0.18, 0.00, 0.1]) #['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'INTERACT', 'TOGGLE_CART']
+        else:
+            action = np.argmax(self.qtable.loc[state])
+
+        return action

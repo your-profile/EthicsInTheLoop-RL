@@ -148,8 +148,6 @@ if __name__ == "__main__":
                 next_state = recv_socket_data(sock_game)  # get observation from env
             
             
-            print(next_state)
-            
             if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
                 break 
             

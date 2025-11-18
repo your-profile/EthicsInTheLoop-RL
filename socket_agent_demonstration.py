@@ -112,12 +112,14 @@ if __name__ == "__main__":
     demonstration_dict = {}
     pygame.time.wait(5000)
     screen.fill(green)
+    end = 0
 
     for i in range(training_time):
         final_episode_steps, final_episode_states, final_episode_rewards, final_episode_actions  = [], [], [], []
 
         sock_game.send(str.encode("0 RESET"))  # reset the game
         state = recv_socket_data(sock_game)
+        print(state)
         state = json.loads(state)
         cnt = 0
 
@@ -139,12 +141,20 @@ if __name__ == "__main__":
             print("Sending action: ", action)
             sock_game.send(str.encode(action))  # send action to env
             next_state = recv_socket_data(sock_game)  # get observation from env
+
             
-            if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
+            if (((state['observation']['players'][0]['direction']) != (action_index - 1)) and (action_index != 5)): 
                 sock_game.send(str.encode(action))  # send action to env
                 next_state = recv_socket_data(sock_game)  # get observation from env
             
+            
+            print(next_state)
+            
+            if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
+                break 
+            
             next_state = json.loads(next_state)
+        
 
             # Define the reward based on the state and next_state
             reward = calculate_reward(state, next_state)  # You need to define this function
@@ -173,5 +183,6 @@ if __name__ == "__main__":
 
     # Close socket connection
     save_demo(demonstration_dict, pid)
+    print("Number ended: ", end)
     sock_game.close()
 

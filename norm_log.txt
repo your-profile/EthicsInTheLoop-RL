@@ -1,7 +1,2 @@
-Player 0 has 6 violations: 
-['Player 0 ran into the basket return']
-['Player 0 ran into the cart return']
-['Player 0 ran into a checkout counter']
-['Player 0 ran into the basket return']
+Player 0 has 1 violations: 
 ['Player 0 took a basket when they have more than 6 items on their shopping list']
-['Player 0 ran into the basket return']

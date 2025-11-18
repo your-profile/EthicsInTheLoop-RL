@@ -12,7 +12,7 @@ class QLAgent:
         self.epsilon = epsilon           # exploit vs. explore probability
         self.mini_epsilon = mini_epsilon # threshold for stopping the decay
         self.decay = decay               # value to decay the epsilon over time
-        self.qtable = pd.DataFrame(np.random.rand(8000, 7), columns=[i for i in range(self.action_space)])
+        self.qtable = pd.DataFrame(np.random.rand(10000, 7), columns=[i for i in range(self.action_space)])
 
     
     def trans(self, state, granularity=1.0):

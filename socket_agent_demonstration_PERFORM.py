@@ -65,7 +65,7 @@ if __name__ == "__main__":
     pid = f"{pid}_Demonstration"
     
     training_time = 2
-    episode_length = 100
+    episode_length = 1000
 
     demonstration_dict = read_demos(pid)
 
@@ -81,12 +81,8 @@ if __name__ == "__main__":
 
         for step in range(demonstration_dict[i]["steps"]):
             cnt += 1
-            # Choose an action based on the current state
             action_index = demonstration_dict[i]["actions"][step]
-            print("Chosen Action: ", action_index)
             action = "0 " + action_commands[action_index]
-
-            print("Sending action: ", action)
             sock_game.send(str.encode(action))  # send action to env
             next_state = recv_socket_data(sock_game)  # get observation from env
             
@@ -94,14 +90,13 @@ if __name__ == "__main__":
                 sock_game.send(str.encode(action))  # send action to env
                 next_state = recv_socket_data(sock_game)  # get observation from env
             
+            if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
+                break 
+            
             next_state = json.loads(next_state)
 
-            # Define the reward based on the state and next_state
             reward = calculate_reward(state, next_state)  # You need to define this function
-            print("------------------------------------------")
-            print(reward, action_commands[action_index])
-            print("------------------------------------------")
-            # Update Q-table
+            
             agent.learning(action_index, reward, agent.trans(state), agent.trans(next_state))
             state = next_state
 
@@ -111,8 +106,6 @@ if __name__ == "__main__":
                 break
 
         print(cnt)
-
-        # Additional code for end of episode if needed
 
     sock_game.close()
 

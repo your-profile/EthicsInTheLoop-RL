@@ -182,20 +182,11 @@ class Game:
 # broccoli, cucumber, yellow bell pepper, onion, prepared foods, fresh fish
     
         self.preset_shopping_list = [
-            [['milk'],
-            ['fresh fish']],
-            [
-            ['apples', 'swiss cheese', 'raspberry', 'avocado'],
-            ['apples', 'milk', 'fresh fish', 'brie cheese','prepared foods']
-            ],
-        [   ['apples', 'oranges', 'cheese wheel', 'leek', 'red bell pepper', 'avocado', 'raspberry'],
-            ['apples', 'milk', 'fresh fish', 'brie cheese', 'prepared foods', 'avocado', 'raspberry']
-            ]
+            [['brie cheese'],
+            ['brie cheese']],
         ]
         self.preset_quantities = [
-            [[1], [2]],
-            [[1, 1, 1, 1], [1, 2, 1, 2, 1]],
-            [[1, 1, 1, 1, 1, 1, 1], [1, 2, 1, 2, 1, 3, 1]]
+            [[1], [1]]
         ]
                                      
 

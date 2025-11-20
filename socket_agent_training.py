@@ -36,6 +36,14 @@ def calculate_reward(previous_state, current_state):
     # You should design a function to calculate the reward for the agent to guide the agent to do the desired task
     pass
 
+def read_demos(demo_filename=None):
+
+    file = open('./data/{}.pickle'.format(demo_filename), 'rb')
+    demo_dict = pickle.load(file)
+    file.close()
+
+    return demo_dict
+
 if __name__ == "__main__":
     
 
@@ -55,9 +63,59 @@ if __name__ == "__main__":
     PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
+    pid = input("Input the Participant ID: ")
+    pid = f"{pid}_Demonstration"
+
+    demonstration_dict = read_demos(pid)
 
     training_time = 100
     episode_length = 1000
+
+    ## Q-PRIMING
+
+    for i in demonstration_dict.keys():
+        print(i)
+        sock_game.send(str.encode("0 RESET"))  # reset the game
+        state = recv_socket_data(sock_game)
+        state = json.loads(state)
+        cnt = 0
+
+        episode_dict = demonstration_dict[0]
+        print(episode_dict["actions"])
+
+        for step in range(demonstration_dict[i]["steps"]):
+            cnt += 1
+            print(step, demonstration_dict[i]["steps"])
+            action_index = demonstration_dict[i]["actions"][step]
+            action = "0 " + action_commands[action_index]
+            sock_game.send(str.encode(action))  # send action to env
+            next_state = recv_socket_data(sock_game)  # get observation from env
+            
+            if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
+                sock_game.send(str.encode(action))  # send action to env
+                next_state = recv_socket_data(sock_game)  # get observation from env
+            
+            if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
+                break 
+
+            next_state = json.loads(next_state)
+
+            priming_value = 20
+            
+            agent.priming(action_index, priming_value, agent.trans(state), agent.trans(next_state))
+            state = next_state
+
+            agent.qtable.to_json('primed_qtable.json')
+
+            if cnt >= demonstration_dict[i]["steps"] - 1:
+                break
+
+        print(cnt)
+
+
+
+    input("Enter to go to Training: ")
+
     for i in range(training_time):
         sock_game.send(str.encode("0 RESET"))  # reset the game
         state = recv_socket_data(sock_game)

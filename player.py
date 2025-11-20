@@ -85,11 +85,11 @@ class Player:
         self.stage[3] = 5
 
     def set_shopping_list(self, food_list):
-        list_length = randint(1, 12)
-        num_food_items = len(food_list)
-        for i in range(list_length):
-            x = randint(0, num_food_items - 1)
-            self.shopping_list.append(food_list[x])
+        # list_length = randint(1, 12)
+        # num_food_items = len(food_list)
+        # for i in range(list_length):
+        #     x = randint(0, num_food_items - 1)
+        self.shopping_list.append("brie cheese")
         rendering_food = []
 
         # setting quantities for duplicate foods

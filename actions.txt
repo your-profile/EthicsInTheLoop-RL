@@ -1,2 +1,2 @@
-player 0 has taken: 8910 actions
+player 0 has taken: 488 actions
 Player 0 has taken the least actions

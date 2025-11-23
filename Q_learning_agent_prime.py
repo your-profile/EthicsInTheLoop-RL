@@ -17,7 +17,7 @@ class QLAgent:
         num_states = 26*26*2*2*2
         self.qtable = pd.DataFrame(np.random.rand(num_states, action_space), columns=list(range(action_space)))
 
-    def trans(self, state, granularity=1.0):
+    def trans(self, state, granularity=1.0, verbose=False):
 
         shopping_list = set(state['observation']['players'][0]['shopping_list'])
         selected_items = []
@@ -26,7 +26,6 @@ class QLAgent:
         if len(state['observation']['baskets']) > 0:
             basket_list = set(state['observation']['baskets'][0]['contents'])
             purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
-            print(basket_list, selected_items, purchased_list)
             selected_items = shopping_list.difference(basket_list)
             purchased_items = shopping_list.difference(purchased_list)
 
@@ -40,15 +39,18 @@ class QLAgent:
         has_checkout = int(len(list(purchased_items)))
 
         if has_basket >= 1:
-            print("Has a basket!")
+            if verbose:
+                print("Has a basket!")
             has_basket = 1
 
             if has_items ==0:
-                print("Has all items!")
+                if verbose:
+                    print("Has all items!")
                 has_items = 1
 
             if has_checkout == 0:
-                print("Purchased all items!")
+                if verbose:
+                    print("Purchased all items!")
                 has_checkout = 1
 
         #encoding: ((((x,y)*2 + cart)*2 + items)*2 + checkout)

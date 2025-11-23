@@ -107,7 +107,7 @@ if __name__ == "__main__":
     screen.fill(red)
 
 
-    training_time = 4
+    training_time = 15
     episode_length = 1000
     demonstration_dict = {}
     pygame.time.wait(5000)

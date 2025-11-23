@@ -75,4 +75,6 @@ class QLAgent:
         else:
             action = np.argmax(self.qtable.loc[state])
 
+        self.epsilon -= 0.005
+
         return action

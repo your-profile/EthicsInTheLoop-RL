@@ -8,7 +8,7 @@ import gymnasium as gym
 from env import SupermarketEnv
 from utils import recv_socket_data
 
-from Q_Learning_agent import QLAgent  # Make sure to import your QLAgent class
+from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent class
 import pickle
 import pandas as pd
 
@@ -43,6 +43,11 @@ def read_demos(demo_filename=None):
     file.close()
 
     return demo_dict
+
+def save_qtable(agent, filename="qtable.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(agent.qtable, f)
+    print(f"Q-table saved to {filename}")
 
 if __name__ == "__main__":
     
@@ -85,7 +90,7 @@ if __name__ == "__main__":
 
         for step in range(demonstration_dict[i]["steps"]):
             cnt += 1
-            print(step, demonstration_dict[i]["steps"])
+            # print(step, demonstration_dict[i]["steps"])
             action_index = demonstration_dict[i]["actions"][step]
             action = "0 " + action_commands[action_index]
             sock_game.send(str.encode(action))  # send action to env
@@ -105,12 +110,17 @@ if __name__ == "__main__":
             agent.priming(action_index, priming_value, agent.trans(state), agent.trans(next_state))
             state = next_state
 
-            agent.qtable.to_json('primed_qtable.json')
 
             if cnt >= demonstration_dict[i]["steps"] - 1:
                 break
-
+        
         print(cnt)
+
+    agent.qtable.to_json('primed_qtable.json')
+    save_qtable(agent)
+
+    
+
 
 
 

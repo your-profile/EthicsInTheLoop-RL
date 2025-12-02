@@ -78,12 +78,6 @@ if __name__ == "__main__":
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
     agent = QLAgent(action_space, epsilon=0.01)
 
-####################
-    #Once you have your agent trained, or you want to continue training from a previous training session, you can load the qtable from a json file
-    #agent.qtable = pd.read_json('qtable.json')
-####################
-    
-    
     # Connect to Supermarket
     HOST = '127.0.0.1'
     PORT = 1972
@@ -91,11 +85,10 @@ if __name__ == "__main__":
     sock_game.connect((HOST, PORT))
     pid = input("Input the Participant ID: ")
     pid = f"{pid}_Demonstration"
-
-    demonstration_dict = read_demos(pid)
-
     training_time = 100
     episode_length = 1000
+
+    demonstration_dict = read_demos(pid)
 
     ## Q-PRIMING
 
@@ -164,8 +157,6 @@ if __name__ == "__main__":
                 break 
 
             next_state = json.loads(next_state)
-
-            
 
             # Define the reward based on the state and next_state
             reward = calculate_reward(state, next_state)  # You need to define this function

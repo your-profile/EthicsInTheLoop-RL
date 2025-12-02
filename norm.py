@@ -12,7 +12,7 @@ cnt = 0
 class NormViolation(ABC):
     def __init__(self):
         pass
-
+ 
     @abstractmethod
     def as_string(self):
         pass

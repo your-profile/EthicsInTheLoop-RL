@@ -1,2 +1,5 @@
-Player 0 has 1 violations: 
-['Player 0 ran into the basket return']
+Player 0 has 4 violations: 
+['Player 0 ran into a checkout counter']
+['Player 0 ran into the brie cheese shelf']
+['Player 0 ran into the brie cheese shelf']
+['Player 0 took more brie cheese than they needed']

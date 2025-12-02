@@ -54,7 +54,7 @@ def calculate_reward(previous_state, state):
 
     if state['observation']['players'][0]['position'][0] < 0.3:
         return -10
-
+    
     return -1
 
 def read_demos(demo_filename=None):

@@ -28,33 +28,40 @@ class QLAgent:
             purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
             selected_items = shopping_list.difference(basket_list)
             purchased_items = shopping_list.difference(purchased_list)
+            print(f"Shopping List: {shopping_list}, In Basket: {basket_list}, Purchased: {purchased_list}")
+            print(f"Purchased Items: {purchased_items}, Selected Items: {selected_items}")
+
 
 
         # You should design a function to transform the huge state into a learnable state for the agent
         # It should be simple but also contains enough information for the agent to learn
         player_x = int(state['observation']['players'][0]['position'][0]*granularity)
         player_y = int(state['observation']['players'][0]['position'][1]*granularity)
-        has_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
-        has_items = int(len(list(selected_items)))
-        has_checkout = int(len(list(purchased_items)))
+        num_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
+        num_items = int(len(list(selected_items)))
+        num_checkout = int(len(list(purchased_items)))
 
-        if has_basket >= 1:
+        has_items, has_basket, has_checkout = 0,0,0
+
+        if num_basket >= 1:
             if verbose:
                 print("Has a basket!")
             has_basket = 1
 
-            if has_items ==0:
+            if num_items == 0:
                 if verbose:
                     print("Has all items!")
                 has_items = 1
 
-            if has_checkout == 0:
+            if num_checkout == 0:
                 if verbose:
                     print("Purchased all items!")
+                print(state['observation'])
                 has_checkout = 1
 
         #encoding: ((((x,y)*2 + cart)*2 + items)*2 + checkout)
         idx = ((((player_x*26 + player_y)*2 + has_basket)*2 + has_items)*2 + has_checkout)
+        print(f"Has Basket: {has_basket}, Has Items: {has_items}, Has Checked Out: {has_checkout}")
 
         return idx
 

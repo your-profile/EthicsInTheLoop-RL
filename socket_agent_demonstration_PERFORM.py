@@ -8,7 +8,7 @@ import gymnasium as gym
 from env import SupermarketEnv
 from utils import recv_socket_data
 
-from Q_Learning_agent import QLAgent  # Make sure to import your QLAgent class
+from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent class
 import pickle
 import pandas as pd
 

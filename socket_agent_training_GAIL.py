@@ -57,7 +57,7 @@ def one_hot(a, act_dim):
     y[a] = 1
     return y
 
-#TODO: Finish Function
+#TODO: Finish Function that takes a proper shopper states and transforms it into a state feature vector
 def state_to_obs(state):
     x = None
     
@@ -68,7 +68,18 @@ def state_to_obs(state):
 
     return state
 
-#takes demonstration dictionary and separates feature states and actions
+#takes demonstration dict and separates feature states and actions
+'''
+Toy example with three timesteps
+
+feature = [has_item, has_cart, has_chekcout]
+expert_obs = [[0, 1, 0] timestep 1 where (no items, has a cart, not checked out)
+                [0, 0, 1] timestep 2
+                [1, 0, 0] timestep 3
+                ]
+
+expert_actions = [0,6,3]
+'''
 def split_demonstrations(dictionary):
 
     expert_obs, expert_actions = [], []

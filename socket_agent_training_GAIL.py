@@ -22,7 +22,7 @@ class Generator(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(obs_dim, 64), nn.ReLU(),
             nn.Linear(64, 64), nn.ReLU(),
-            nn.Linear(64, act_dim)
+            nn.Linear(64, act_dim),
         )
 
     def forward(self, obs):
@@ -44,7 +44,7 @@ class Discriminator(nn.Module):
             nn.Linear(obs_dim + act_dim, 64), nn.ReLU(),
             nn.Linear(64, 64), nn.ReLU(),
             nn.Linear(64, 1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, obs, act_onehot):
@@ -165,7 +165,7 @@ def collect_policy_trajectories(sock_game, policy, steps=1000):
     return np.array(obs_list), np.array(action_list)
 
 # traininf loop
-def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, save_dir="gail_output"):
+def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, save_dir="gail_output", lr = 3e-4):
     #TODO: hard code obs space size and action space size
     obs_dim = None #FIGURE OUT
     act_dim = 7
@@ -174,8 +174,8 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, sav
     policy = Generator(obs_dim, act_dim)
     discr = Discriminator(obs_dim, act_dim)
 
-    opt_policy = optim.Adam(policy.parameters(), lr=3e-4)
-    opt_discr = optim.Adam(discr.parameters(), lr=3e-4)
+    opt_policy = optim.Adam(policy.parameters(), lr=lr)
+    opt_discr = optim.Adam(discr.parameters(), lr=lr)
 
     expert_obs_t = torch.tensor(expert_obs, dtype=torch.float32)
     expert_act_onehot = torch.tensor([one_hot(a, act_dim) for a in expert_actions], dtype=torch.float32)
@@ -185,31 +185,33 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, sav
 
     for it in range(iterations):
         # policy rollouts
-        pol_obs, pol_actions = collect_policy_trajectories(env, policy)
-
-        pol_obs_t = torch.tensor(pol_obs, dtype=torch.float32)
-        pol_act_one = torch.tensor([one_hot(a, act_dim) for a in pol_actions], dtype=torch.float32)
-        pol_act_t = torch.tensor(pol_actions, dtype=torch.long)
+        policy_obs, policy_actions = collect_policy_trajectories(env, policy)
+        policy_obs_tensor = torch.tensor(policy_obs, dtype=torch.float32)
+        policy_action_onehot = torch.tensor([one_hot(a, act_dim) for a in policy_actions], dtype=torch.float32)
+        policy_action_tensor = torch.tensor(policy_actions, dtype=torch.long)
 
         # trainig discriminator
-        D_exp = discr(expert_obs_t, expert_act_onehot)
-        D_pol = discr(pol_obs_t, pol_act_one)
+        discriminator_expert = discr(expert_obs_t, expert_act_onehot)
+        discriminator_policy = discr(policy_obs_tensor, policy_action_onehot)
 
-        discr_loss = -torch.mean(torch.log(D_exp + 1e-8) + torch.log(1 - D_pol + 1e-8))
+        discr_loss = -torch.mean(torch.log(discriminator_expert + 1e-8) + torch.log(1 - discriminator_policy + 1e-8))
         opt_discr.zero_grad()
         discr_loss.backward()
         opt_discr.step()
 
         # rewards for policy
         with torch.no_grad():
-            rewards = -torch.log(1 - discr(pol_obs_t, pol_act_one) + 1e-8)
+            rewards = -torch.log(1 - discr(policy_obs_tensor, policy_action_onehot) + 1e-8)
 
-        # update policy (PPO)
         log_probs = []
-        for i in range(len(pol_obs)):
-            logits = policy(torch.tensor(pol_obs[i], dtype=torch.float32))
+        # update policy (PPO)
+
+        for i in range(len(policy_obs)):
+            logits = policy(torch.tensor(policy_obs[i], dtype=torch.float32))
             dist = torch.distributions.Categorical(logits=logits)
-            log_probs.append(dist.log_prob(pol_act_t[i]))
+            log_probs.append(dist.log_prob(policy_action_tensor[i]))
+
+
         log_probs = torch.stack(log_probs)
 
         policy_loss = -(log_probs * rewards.squeeze()).mean() #loss
@@ -218,7 +220,7 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, sav
         opt_policy.step()
 
         if it % 50 == 0:
-            print(f"Iteration {it} | Disc Loss: {discr_loss.item():.3f} | Policy Loss: {policy_loss.item():.3f}")
+            print(f"Iteration {it} | Discriminator Loss: {discr_loss.item():.3f} | Generator Loss: {policy_loss.item():.3f}")
 
     # saving outputs
     torch.save(policy.state_dict(), os.path.join(save_dir, f"GAIL_generator_{checkpoint}.pth"))

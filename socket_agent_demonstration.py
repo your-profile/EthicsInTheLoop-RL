@@ -40,22 +40,27 @@ red = (255, 0, 0)
 green = (0, 255, 0)
 
 def choose_human_action():
-    pygame.event.pump() 
-    pressed = pygame.key.get_pressed()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
 
-    if pressed[pygame.K_UP]: #north
-        return 1
-    elif pressed[pygame.K_LEFT]: #west
-        return 4
-    elif pressed[pygame.K_DOWN]: #south
-        return 2
-    elif pressed[pygame.K_RIGHT]: #east
-        return 3
-    elif pressed[pygame.K_RSHIFT]: #interact
-        return 6
-    elif pressed[pygame.K_c]: #toggle cart
-        return 5
-    return 0
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:      # north
+                    return 1
+                elif event.key == pygame.K_LEFT:  # west
+                    return 4
+                elif event.key == pygame.K_DOWN:  # south
+                    return 2
+                elif event.key == pygame.K_RIGHT: # east
+                    return 3
+                elif event.key == pygame.K_RETURN: # interact
+                    return 6
+                elif event.key == pygame.K_c:     # toggle cart
+                    return 5
+
+        # pygame.time.wait(10)
 
 def save_demo(demonstration_dict, demo_filename):
     with open('./data/{}.pickle'.format(demo_filename), 'wb') as handle:
@@ -107,7 +112,7 @@ if __name__ == "__main__":
     screen.fill(red)
 
 
-    training_time = 15
+    training_time = 5
     episode_length = 1000
     demonstration_dict = {}
     pygame.time.wait(5000)

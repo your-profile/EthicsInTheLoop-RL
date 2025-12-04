@@ -8,7 +8,7 @@ import gymnasium as gym
 from env import SupermarketEnv
 from utils import recv_socket_data
 
-from Q_Learning_agent import QLAgent  # Make sure to import your QLAgent class
+from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent class
 import pickle
 import pandas as pd
 
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
     agent = QLAgent(action_space)
-    agent.qtable = pd.read_json('primed_qtable.json')
+    agent.qtable = pd.read_json('qtable_10B.json')
 
     
     
@@ -40,23 +40,36 @@ if __name__ == "__main__":
         while not state['gameOver']:
             cnt += 1
             # Choose an action based on the current state
-            action_index = agent.choose_action(state)
+            action_index = agent.choose_action(agent.trans(state))
             action = "0 " + action_commands[action_index]
 
-            print("Sending action: ", action)
+            sock_game.send(str.encode(action))  # send action to env
             next_state = recv_socket_data(sock_game)  # get observation from env
             
-            if (((state['observation']['players'][0]['direction']) != (action_index - 1))): 
+            if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
                 sock_game.send(str.encode(action))  # send action to env
                 next_state = recv_socket_data(sock_game)  # get observation from env
             
+            if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
+                break 
+
             next_state = json.loads(next_state)
+
+            # Define the reward based on the state and next_state
+            # reward = calculate_reward(state, next_state)  # You need to define this function
+
+            # if state['observation']['players'][0]['position'][0] < 0.4:
+            #     print("------------------------------------------")
+            #     print(reward, action_commands[action_index])
+            #     print("------------------------------------------")
+            # Update Q-table
+            # agent.learning(action_index, reward, agent.trans(state), agent.trans(next_state))
 
             # Update state
             state = next_state
-            agent.qtable.to_json('qtable.json')
+            # agent.qtable.to_json('qtable_2.json')
 
-            if cnt > episode_length:
+            if cnt >= episode_length:
                 break
         # Additional code for end of episode if needed
 

@@ -71,10 +71,10 @@ def state_to_obs(state):
 '''
 Toy example with three timesteps
 
-feature = [has_item, has_cart, has_chekcout]
-expert_obs = [[0, 1, 0] timestep 1 where (no items, has a cart, not checked out)
-                [0, 0, 1] timestep 2
-                [1, 0, 0] timestep 3
+feature = [x, y, has_item, has_cart, has_chekcout]
+expert_obs = [[x, y, 0, 1, 0] timestep 1 where (no items, has a cart, not checked out)
+                [x, y, 0, 0, 1] timestep 2
+                [x, y, 1, 0, 0] timestep 3
                 ]
 
 expert_actions = [0,6,3]

@@ -46,19 +46,21 @@ def choose_human_action():
                 pygame.quit()
                 raise SystemExit
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:      # north
-                    return 1
-                elif event.key == pygame.K_LEFT:  # west
-                    return 4
-                elif event.key == pygame.K_DOWN:  # south
-                    return 2
-                elif event.key == pygame.K_RIGHT: # east
-                    return 3
-                elif event.key == pygame.K_RETURN: # interact
-                    return 6
-                elif event.key == pygame.K_c:     # toggle cart
-                    return 5
+        keys = pygame.key.get_pressed()
+
+        if keys[pygame.K_UP]:
+            return 1
+        elif keys[pygame.K_LEFT]:
+            return 4
+        elif keys[pygame.K_DOWN]:
+            return 2
+        elif keys[pygame.K_RIGHT]:
+            return 3
+        elif keys[pygame.K_RETURN]:
+            return 6
+        elif keys[pygame.K_c]:
+            return 5
+
 
         # pygame.time.wait(10)
 
@@ -112,7 +114,7 @@ if __name__ == "__main__":
     screen.fill(red)
 
 
-    training_time = 5
+    training_time = 10
     episode_length = 1000
     demonstration_dict = {}
     pygame.time.wait(5000)

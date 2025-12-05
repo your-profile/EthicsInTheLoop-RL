@@ -65,7 +65,7 @@ def read_demos(demo_filename=None):
 
     return demo_dict
 
-def save_qtable(agent, filename="qtable.pkl"):
+def save_qtable(agent, filename="primed_qtable.pkl"):
     with open(filename, "wb") as f:
         pickle.dump(agent.qtable, f)
     print(f"Q-table saved to {filename}")

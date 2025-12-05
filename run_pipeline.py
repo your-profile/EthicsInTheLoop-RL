@@ -22,6 +22,7 @@ python ./run_pipeline.py > angela_testing_file.txt
 import json
 import random
 import socket
+import os
 
 import gymnasium as gym
 from env import SupermarketEnv
@@ -160,9 +161,11 @@ def prime_from_demos():
         pid_without_extension = pid.split(".")[0]
         path_to_jsons = "pipeline_primed_qtables_json"
         path_to_pkls = "pipeline_primed_qtables_pkl"
+        # os.makedirs(path_to_jsons)
+        # os.makedirs(path_to_pkls)
         agent.qtable.to_json(f'{path_to_jsons}/{pid_without_extension}_pipeline_primed_qtable.json')
-        save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.json')
-        print(f"Saved qtable as {pid_without_extension}.json and {pid_without_extension}.pkl")
+        save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
+        print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")
 
         # UNCOMMENT & MODIFY IF WE WANT TO DO FURTHER TRAINING :)!
         # input("Enter to go to Training: ")
@@ -226,6 +229,7 @@ def evaluate_primed_qtables_from_demos():
     
     # for debugging:
     qtables = ['10G_Demonstration_pipeline_primed_qtable.json']
+    
     for qt in qtables:
         agent = QLAgent(action_space)
         json_path = f"{json_dir}/{qt}"

@@ -14,6 +14,9 @@ from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent c
 import pickle
 import pandas as pd
 
+granularity = 4.0
+HEIGHT= int(26*granularity)
+WIDTH = int(26*granularity)
 
 # Policy network (GAIL generator)
 class Generator(nn.Module):
@@ -56,7 +59,7 @@ def one_hot(a, act_dim):
     y[a] = 1
     return y
 
-#TODO: Finish Function that takes a proper shopper states and transforms it into a state feature vector
+# Function that takes a proper shopper states and transforms it into a state feature vector
 def state_to_obs(state):
     x = None
 
@@ -137,30 +140,39 @@ def is_episode_over(obs):
     return obs
 
 # looks at primed q table and pull the most visited/highest value states. Return as state checkpoints
-def calcuate_checkpoints_from_primedQ(table):
-    checkpoints_states = []
-    x = []
+def calcuate_checkpoints_from_primedQ(table, n=5):
 
-    try:
-        assert(len(x) > 0)
-    except:
-        AssertionError("Function not completed")
+    collapsed = np.zeros((HEIGHT, WIDTH))
+    vector = [0, 0, 0, 0, 0, 0, 0]
+    top_checkpoints = []
 
-    return checkpoints_states
+    # add empty checkpoints
+    for i in range(n):
+        top_checkpoints.append(vector)
 
-def find_checkpoints(table):
-    '''
-    TODO: find the state chekcpoints from the primed Q table. 
-    TODO: Then convert each to feature obs. Return the list of obs
-    '''
-    checkpoint_states = calcuate_checkpoints_from_primedQ(table)
-    checkpoint_obs = []
+    # compute top5 cells
+    for x in range(HEIGHT):
+        for y in range(WIDTH):
+            cell_value = 0
+            for cart in [0, 1]:
+                for items in [0, 1]:
+                    for checkout in [0, 1]:
+                        idx = ((((x * HEIGHT + y) * 2 + cart) * 2 + items) * 2 + checkout)
 
-    for c in checkpoint_states:
-        c_obs = state_to_obs(c)
-        checkpoint_obs.append(c_obs)
+                        cell_value += table.loc[idx].sum()
 
-    return c_obs
+
+                        vector = [idx, x, y, cart, items, checkout, cell_value]
+
+                        # replace empty or lower checkpoints
+                        for i, item in enumerate(top_checkpoints):
+                            if cell_value > top_checkpoints[i][-1]:
+                                top_checkpoints[i] = vector
+                                break
+
+            collapsed[x, y] = cell_value
+
+    return top_checkpoints
 
 
 # policy rollout trajectory collection
@@ -272,10 +284,10 @@ def main():
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
     
-    with open('primed_qtable.json', 'r') as file:
-        primed_qtable = json.load(file)
+    with open('primed_qtable.pkl', 'rb') as file:
+        primed_qtable = pickle.load(file)
 
-    checkpoints = find_checkpoints(primed_qtable) #TODO: Return major checkpoints as feature observations
+    checkpoints = calcuate_checkpoints_from_primedQ(primed_qtable)
 
     # Connect to Supermarket
     HOST = '127.0.0.1'

@@ -22,6 +22,7 @@ python ./run_pipeline.py > angela_testing_file.txt
 import json
 import random
 import socket
+import os
 
 import gymnasium as gym
 from env import SupermarketEnv
@@ -89,7 +90,7 @@ def save_qtable(agent, filename="qtable.pkl"):
         pickle.dump(agent.qtable, f)
     # print(f"Q-table saved to {filename}")
 
-def prime_from_demos():
+def prime_from_demos(sock_game):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
@@ -103,17 +104,7 @@ def prime_from_demos():
     
     # GO THROUGH EACH DEMO AND PRIME Q TABLE
     for pid in pids:
-        # Connect to Supermarket
-        HOST = '127.0.0.1'
-        PORT = 1972
-        sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock_game.connect((HOST, PORT))
-        # pid = input("Input the Participant ID: ")
-        # pid_demo = f"{pid}_Demonstration"
         print(f"Now priming with: {pid}")
-        training_time = 100
-        episode_length = 1000
-
         demonstration_dict = read_demos(pid)
 
         ## Q-PRIMING
@@ -145,7 +136,7 @@ def prime_from_demos():
 
                 next_state = json.loads(next_state)
 
-                priming_value = 20
+                priming_value = 30
                 
                 agent.priming(action_index, priming_value, agent.trans(state), agent.trans(next_state))
                 state = next_state
@@ -160,9 +151,11 @@ def prime_from_demos():
         pid_without_extension = pid.split(".")[0]
         path_to_jsons = "pipeline_primed_qtables_json"
         path_to_pkls = "pipeline_primed_qtables_pkl"
+        # os.makedirs(path_to_jsons)
+        # os.makedirs(path_to_pkls)
         agent.qtable.to_json(f'{path_to_jsons}/{pid_without_extension}_pipeline_primed_qtable.json')
-        save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.json')
-        print(f"Saved qtable as {pid_without_extension}.json and {pid_without_extension}.pkl")
+        save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
+        print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")
 
         # UNCOMMENT & MODIFY IF WE WANT TO DO FURTHER TRAINING :)!
         # input("Enter to go to Training: ")
@@ -209,11 +202,11 @@ def prime_from_demos():
         #     # Additional code for end of episode if needed
 
         # Close socket connection
-        sock_game.close()
+        # sock_game.close()
         
 # PERFORMING FROM PRIMED QTABLES / EVALUATION
 
-def evaluate_primed_qtables_from_demos():
+def evaluate_primed_qtables_from_demos(sock_game):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
@@ -226,17 +219,15 @@ def evaluate_primed_qtables_from_demos():
     
     # for debugging:
     qtables = ['10G_Demonstration_pipeline_primed_qtable.json']
+    
     for qt in qtables:
         agent = QLAgent(action_space)
-        json_path = f"{json_dir}/{qt}"
+        json_path = f"./{json_dir}/{qt}"
         agent.qtable = pd.read_json(json_path)
+        print(agent.qtable)
         print(f"Now evaluating: {qt}")
+        input()
         
-        # Connect to Supermarket
-        HOST = '127.0.0.1'
-        PORT = 1972
-        sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock_game.connect((HOST, PORT))
 
         training_time = 100
         episode_length = 1000
@@ -282,12 +273,17 @@ def evaluate_primed_qtables_from_demos():
             # Additional code for end of episode if needed
 
         # Close socket connection
-        sock_game.close()
+        # sock_game.close()
     
-
+# Connect to Supermarket
+HOST = '127.0.0.1'
+PORT = 1972
+sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock_game.connect((HOST, PORT))
 # execute    
-prime_from_demos()
-evaluate_primed_qtables_from_demos()
+prime_from_demos(sock_game)
+evaluate_primed_qtables_from_demos(sock_game)
+sock_game.close()
 # TODO get metrics and plot nicely in some way
         
         

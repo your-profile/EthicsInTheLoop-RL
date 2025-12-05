@@ -131,7 +131,7 @@ def split_demonstrations(dictionary):
     #obs = state_to_obs(state)
 
     try:
-        assert(len(expert_obs)>0)
+        assert(len(expert_obs) == len(expert_actions))
     except:
         AssertionError("Function not written")
     
@@ -318,8 +318,8 @@ def main():
 
     expert_obs, expert_actions = split_demonstrations(demonstration_dict)
 
-    np.save(os.path.join("outputGail", f"expert_obs.npy"), expert_obs)
-    np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions)
+    np.save(os.path.join("outputGail", f"expert_obs.npy"), expert_obs, allow_pickle=True)
+    np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions, allow_pickle=True)
 
     for i, checkpoint in enumerate(checkpoints):
         policy, discr = train_gail(sock_game, expert_obs, expert_actions, iterations=2000, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)

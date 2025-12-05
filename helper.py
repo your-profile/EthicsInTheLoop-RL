@@ -19,7 +19,7 @@ def pos_collision(x1, y1,  x2, y2, x_margin, y_margin):
     return x1 - x_margin < x2 < x1 + x_margin and y1 - y_margin < y2 < y1 + y_margin
 
 
-def can_interact_default(obj, player, range=0.5):
+def can_interact_default(obj, player, range=0.75):
     if player.direction == Direction.NORTH:
         return obj.collision(player, player.position[0], player.position[1] - range)
     elif player.direction == Direction.SOUTH:

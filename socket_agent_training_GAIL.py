@@ -59,13 +59,42 @@ def one_hot(a, act_dim):
 #TODO: Finish Function that takes a proper shopper states and transforms it into a state feature vector
 def state_to_obs(state):
     x = None
-    
-    try:
-        assert(len(x) > 0)
-    except:
-        AssertionError("Function not completed")
 
-    return state
+    shopping_list = set(state['observation']['players'][0]['shopping_list'])
+    selected_items = []
+    purchased_items = []
+
+    if len(state['observation']['baskets']) > 0:
+        basket_list = set(state['observation']['baskets'][0]['contents'])
+        purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
+        selected_items = shopping_list.difference(basket_list)
+        purchased_items = shopping_list.difference(purchased_list)
+
+    # You should design a function to transform the huge state into a learnable state for the agent
+    # It should be simple but also contains enough information for the agent to learn
+    # print(state['observation']['players'][0]['position'])
+    player_x = round(state['observation']['players'][0]['position'][0] * 4.0)
+    player_y = round(state['observation']['players'][0]['position'][1] * 4.0)
+    num_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
+    num_items = int(len(list(selected_items)))
+    num_checkout = int(len(list(purchased_items)))
+    player_direction = state['observation']['players'][0]['direction']
+
+    has_items, has_basket, has_checkout = 0, 0, 0
+
+    if num_basket >= 1:
+        has_basket = 1
+
+        if num_items == 0:
+            has_items = 1
+
+        if num_checkout == 0:
+            has_checkout = 1
+
+    # encoding: ((((x,y)*2 + cart)*2 + items)*2 + checkout)
+    feature_vector = np.array([player_x, player_y, player_direction, has_basket, has_items, has_checkout])
+
+    return feature_vector
 
 #takes demonstration dict and separates feature states and actions
 '''

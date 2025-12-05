@@ -33,7 +33,7 @@ class Baskets(InteractiveObject):
                                      (self.position[1] + self.render_offset_y - camera.position[1])*config.SCALE))
 
     def can_interact(self, player):
-        return can_interact_default(self, player, range=.5)
+        return can_interact_default(self, player)
 
     def collision(self, obj, x_position, y_position):
         return overlap(self.position[0], self.position[1], self.width, self.height,

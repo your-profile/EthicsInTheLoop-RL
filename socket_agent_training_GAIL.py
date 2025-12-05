@@ -15,7 +15,7 @@ import pickle
 import pandas as pd
 
 granularity = 4.0
-HEIGHT= int(26*granularity)
+HEIGHT = int(26*granularity)
 WIDTH = int(26*granularity)
 
 # Policy network (GAIL generator)
@@ -23,9 +23,9 @@ class Generator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim,64), nn.ReLU(),
-            nn.Linear(64,64), nn.ReLU(),
-            nn.Linear(64,act_dim),
+            nn.Linear(obs_dim,32), nn.ReLU(),
+            nn.Linear(32,32), nn.ReLU(),
+            nn.Linear(32,act_dim),
         )
 
     def forward(self, obs):
@@ -44,9 +44,9 @@ class Discriminator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim+act_dim,64), nn.ReLU(),
-            nn.Linear(64,64), nn.ReLU(),
-            nn.Linear(64,1),
+            nn.Linear(obs_dim+act_dim,32), nn.ReLU(),
+            nn.Linear(32,32), nn.ReLU(),
+            nn.Linear(32,1),
             nn.Sigmoid(),)
 
     def forward(self, obs, act_onehot):
@@ -61,7 +61,6 @@ def one_hot(a, act_dim):
 
 # Function that takes a proper shopper states and transforms it into a state feature vector
 def state_to_obs(state):
-    x = None
 
     shopping_list = set(state['observation']['players'][0]['shopping_list'])
     selected_items = []
@@ -95,7 +94,7 @@ def state_to_obs(state):
             has_checkout = 1
 
     # encoding: ((((x,y)*2 + cart)*2 + items)*2 + checkout)
-    feature_vector = np.array([player_x, player_y, player_direction, has_basket, has_items, has_checkout])
+    feature_vector = np.array([player_x, player_y, has_basket, has_items, has_checkout])
 
     return feature_vector
 
@@ -123,18 +122,12 @@ def split_demonstrations(dictionary):
         for action in dictionary[i]['actions']:
             expert_actions.append(action)
 
-    #expert_obs = 2d array of time x features
-    #expert_actions = 1D array of actions
-
-    # will need to transfer like so:
-    #obs = state_to_obs(state)
-
     print(len(expert_obs), len(expert_actions))
 
     try:
         assert(len(expert_obs) == len(expert_actions))
     except:
-        AssertionError("Function not written")
+        AssertionError("Misaligned State and Actions")
     
     return expert_obs, expert_actions
 
@@ -184,7 +177,9 @@ def calcuate_checkpoints_from_primedQ(table, n=5):
 
 
 # policy rollout trajectory collection
-def collect_policy_trajectories(sock_game, policy, checkpoint, steps=1000):
+def collect_policy_trajectories(sock_game, policy, checkpoint, steps=800):
+    action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
+    
     obs_list, action_list = [], []
     done = False
 
@@ -194,10 +189,12 @@ def collect_policy_trajectories(sock_game, policy, checkpoint, steps=1000):
     obs = state_to_obs(state)
 
     for _ in range(steps):
-        action, _ = policy.choose_action(obs)
+        action_index, _ = policy.choose_action(obs)
+        action = "0 " + action_commands[action_index]
+
 
         obs_list.append(obs)
-        action_list.append(action)
+        action_list.append(action_index)
 
         sock_game.send(str.encode(action))  # send action to env
         next_state = recv_socket_data(sock_game)  # get observation from env
@@ -213,9 +210,9 @@ def collect_policy_trajectories(sock_game, policy, checkpoint, steps=1000):
     return np.array(obs_list), np.array(action_list)
 
 # traininf loop
-def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=1000, save_dir="gail_output", lr = 3e-4, ):
+def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10, save_dir="gail_output", lr = 3e-4, ):
     #TODO: hard code obs space size and action space size
-    obs_dim = None #FIGURE OUT
+    obs_dim = 5
     act_dim = 7
 
     #generator and disctriminator
@@ -242,7 +239,9 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10
         discriminator_expert = discr(expert_obs_t, expert_act_onehot)
         discriminator_policy = discr(policy_obs_tensor, policy_action_onehot)
 
-        discr_loss = -torch.mean(torch.log(discriminator_expert + 1e-8) + torch.log(1 - discriminator_policy + 1e-8))
+        loss_expert = torch.mean(torch.log(discriminator_expert + 1e-8))
+        loss_policy = torch.mean(torch.log(1 - discriminator_policy + 1e-8))
+        discr_loss = -(loss_expert + loss_policy)
         opt_discr.zero_grad()
         discr_loss.backward()
         opt_discr.step()
@@ -323,7 +322,7 @@ def main():
     np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions, allow_pickle=True)
 
     for i, checkpoint in enumerate(checkpoints):
-        policy, discr = train_gail(sock_game, expert_obs, expert_actions, iterations=2000, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)
+        policy, discr = train_gail(sock_game, expert_obs, expert_actions, iterations=800, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)
 
 if __name__ == "__main__":
     main()

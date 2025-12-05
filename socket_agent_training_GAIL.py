@@ -117,18 +117,19 @@ def split_demonstrations(dictionary):
 
     for i in range (len(dictionary)):
         states = dictionary[i]['states']
-        state_array = []
-        for state in states:
-            state_array.append(state_to_obs(state))
-        expert_obs.append(state_array)
-        expert_actions.append(dictionary[i]['actions'])
-
+        for state in states[1:]:
+            state_array = state_to_obs(state)
+            expert_obs.append(state_array)
+        for action in dictionary[i]['actions']:
+            expert_actions.append(action)
 
     #expert_obs = 2d array of time x features
     #expert_actions = 1D array of actions
 
     # will need to transfer like so:
     #obs = state_to_obs(state)
+
+    print(len(expert_obs), len(expert_actions))
 
     try:
         assert(len(expert_obs) == len(expert_actions))

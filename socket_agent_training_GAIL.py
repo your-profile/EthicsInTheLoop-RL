@@ -115,6 +115,15 @@ def split_demonstrations(dictionary):
 
     expert_obs, expert_actions = [], []
 
+    for i in range (len(dictionary)):
+        states = dictionary[i]['states']
+        state_array = []
+        for state in states:
+            state_array.append(state_to_obs(state))
+        expert_obs.append(state_array)
+        expert_actions.append(dictionary[i]['actions'])
+
+
     #expert_obs = 2d array of time x features
     #expert_actions = 1D array of actions
 
@@ -128,16 +137,14 @@ def split_demonstrations(dictionary):
     
     return expert_obs, expert_actions
 
-#TODO: Finish Function
-def is_episode_over(obs):
-    x = None
+# Checks if the observation matches the current checkpoint and returns true if it does. Otherwise returns false
+def is_episode_over(obs, checkpoint):
     
-    try:
-        assert(len(x) > 0)
-    except:
-        AssertionError("Episode Over Function not completed")
+    if np.array_equal(obs, checkpoint):
+        return True
+    else:
+        return False
 
-    return obs
 
 # looks at primed q table and pull the most visited/highest value states. Return as state checkpoints
 def calcuate_checkpoints_from_primedQ(table, n=5):
@@ -176,14 +183,14 @@ def calcuate_checkpoints_from_primedQ(table, n=5):
 
 
 # policy rollout trajectory collection
-def collect_policy_trajectories(sock_game, policy, steps=1000):
+def collect_policy_trajectories(sock_game, policy, checkpoint, steps=1000):
     obs_list, action_list = [], []
     done = False
 
     sock_game.send(str.encode("0 RESET"))  # reset the game
     state = recv_socket_data(sock_game)
     state = json.loads(state)
-    obs = state_to_obs(state) #TODO: finish state to obs one hot vector
+    obs = state_to_obs(state)
 
     for _ in range(steps):
         action, _ = policy.choose_action(obs)
@@ -194,18 +201,18 @@ def collect_policy_trajectories(sock_game, policy, steps=1000):
         sock_game.send(str.encode(action))  # send action to env
         next_state = recv_socket_data(sock_game)  # get observation from env
         obs = state_to_obs(state)
-        done = is_episode_over(obs) #TODO: Function that determines if an episode has ended from the obs vector
+        done = is_episode_over(obs, checkpoint) # determines if an episode has ended from the obs vector
 
         if done:
             sock_game.send(str.encode("0 RESET"))  # reset the game
             state = recv_socket_data(sock_game)
             state = json.loads(state)
-            obs = state_to_obs(state) #TODO: finish state to obs one hot vector
+            obs = state_to_obs(state)
 
     return np.array(obs_list), np.array(action_list)
 
 # traininf loop
-def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, save_dir="gail_output", lr = 3e-4):
+def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=1000, save_dir="gail_output", lr = 3e-4, ):
     #TODO: hard code obs space size and action space size
     obs_dim = None #FIGURE OUT
     act_dim = 7
@@ -225,7 +232,7 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, sav
 
     for it in range(iterations):
         # policy rollouts
-        policy_obs, policy_actions = collect_policy_trajectories(env, policy)
+        policy_obs, policy_actions = collect_policy_trajectories(env, policy, checkpoint)
         policy_obs_tensor = torch.tensor(policy_obs, dtype=torch.float32)
         policy_action_onehot = torch.tensor([one_hot(a, act_dim) for a in policy_actions], dtype=torch.float32)
         policy_action_tensor = torch.tensor(policy_actions, dtype=torch.long)
@@ -263,8 +270,8 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, iterations=1000, sav
             print(f"Iteration {it} | Discriminator Loss: {discr_loss.item():.3f} | Generator Loss: {policy_loss.item():.3f}")
 
     # saving outputs
-    torch.save(policy.state_dict(), os.path.join(save_dir, f"GAIL_generator_{checkpoint}.pth"))
-    torch.save(discr.state_dict(), os.path.join(save_dir, f"GAIL_discriminator_{checkpoint}.pth"))
+    torch.save(policy.state_dict(), os.path.join(save_dir, f"GAIL_generator_{index}.pth"))
+    torch.save(discr.state_dict(), os.path.join(save_dir, f"GAIL_discriminator_{index}.pth"))
     
 
     return policy, discr
@@ -315,7 +322,7 @@ def main():
     np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions)
 
     for i, checkpoint in enumerate(checkpoints):
-        policy, discr = train_gail(sock_game, expert_obs, expert_actions, iterations=2000, save_dir=f"outputGail_{i}", checkpoint=i)
+        policy, discr = train_gail(sock_game, expert_obs, expert_actions, iterations=2000, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)
 
 if __name__ == "__main__":
     main()

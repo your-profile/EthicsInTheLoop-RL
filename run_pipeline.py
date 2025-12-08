@@ -16,7 +16,7 @@ TODO
 
 RUNNING INSTRUCTIONS:
 python3 socket_env.py --headless
-python ./run_pipeline.py > angela_testing_file.txt
+python3 ./run_pipeline.py > angela_testing_file.txt
 '''
 
 import json
@@ -98,7 +98,8 @@ def initialize_csv_files():
     with open('demo_priming_metrics.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['demo_name', 'total_episodes', 'total_steps', 'avg_steps_per_episode', 
-                        'priming_violations', 'violations_per_step', 'qtable_states_populated', 'timestamp'])
+                        'priming_violations', 'violations_per_step', 'qtable_states_populated',
+                        'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp'])
     
     # Evaluation results 
     with open('evaluation_results.csv', 'w', newline='') as f:
@@ -114,14 +115,16 @@ def initialize_csv_files():
                         'total_violations_eval', 'violation_rate_eval', 'violation_rate_demo', 
                         'improvement_ratio', 'timestamp'])
 
-def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count, qtable_size):
+def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count, qtable_size, 
+                       demo_success_rate, demo_avg_steps_success, demo_avg_steps_all):
     """Log metrics from the priming phase"""
     with open('demo_priming_metrics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         avg_steps = total_steps / total_episodes if total_episodes > 0 else 0
         violation_rate = violations_count / total_steps if total_steps > 0 else 0
         writer.writerow([demo_name, total_episodes, total_steps, avg_steps, 
-                        violations_count, violation_rate, qtable_size, datetime.now()])
+                        violations_count, violation_rate, qtable_size,
+                        demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, datetime.now()])
 
 def log_evaluation_episode(demo_name, eval_run, episode_num, success, steps_taken, 
                           violations, has_basket_step, has_items_step, has_checkout_step,
@@ -161,7 +164,11 @@ def prime_from_demos(sock_game):
         # Track metrics for this demo
         total_episodes = len(demonstration_dict.keys())
         total_steps = 0
-        priming_violations = 0  # Track violations during priming
+        priming_violations = 0
+        
+        # Track success metrics for demo
+        demo_successes = []
+        demo_steps_list = []
 
         ## Q-PRIMING
         for episode_key in demonstration_dict.keys():
@@ -170,6 +177,11 @@ def prime_from_demos(sock_game):
             state = recv_socket_data(sock_game)
             state = json.loads(state)
             cnt = 0
+            
+            # Track milestones for this episode
+            has_basket_step = -1
+            has_items_step = -1
+            has_checkout_step = -1
 
             episode_dict = demonstration_dict[episode_key]
             print(f"Actions in episode: {episode_dict['actions']}")
@@ -192,9 +204,32 @@ def prime_from_demos(sock_game):
 
                 next_state = json.loads(next_state)
 
-                # Check for violations (if they're in the state)
+                # Check for violations
                 if 'violations' in next_state and next_state['violations'] != '':
                     priming_violations += len(next_state['violations']) if isinstance(next_state['violations'], list) else 1
+
+                # Track progress milestones
+                shopping_list = set(next_state['observation']['players'][0]['shopping_list'])
+                selected_items = []
+                purchased_items = []
+
+                if len(next_state['observation']['baskets']) > 0:
+                    basket_list = set(next_state['observation']['baskets'][0]['contents'])
+                    purchased_list = set(next_state['observation']['baskets'][0]['purchased_contents'])
+                    selected_items = shopping_list.difference(basket_list)
+                    purchased_items = shopping_list.difference(purchased_list)
+
+                has_basket = int(next_state['observation']['players'][0]['curr_basket'] + 1)
+                has_items = len(next_state['observation']['baskets'][0]['contents']) if len(next_state['observation']['baskets']) > 0 else 0
+                has_checkout = len(next_state['observation']['baskets'][0]['purchased_contents']) if len(next_state['observation']['baskets']) > 0 else 0
+
+                # Record when milestones are reached
+                if has_basket >= 1 and has_basket_step == -1:
+                    has_basket_step = cnt
+                if has_items > 0 and has_items_step == -1:
+                    has_items_step = cnt
+                if has_checkout > 0 and has_checkout_step == -1:
+                    has_checkout_step = cnt
 
                 priming_value = 30
                 agent.priming(action_index, priming_value, agent.trans(state), agent.trans(next_state))
@@ -203,13 +238,32 @@ def prime_from_demos(sock_game):
                 if cnt >= episode_dict["steps"] - 1:
                     break
             
-            print(f"Completed {cnt} steps")
+            # Determine success for this demo episode
+            episode_success = (has_basket_step != -1 and has_items_step != -1 and has_checkout_step != -1)
+            demo_successes.append(1 if episode_success else 0)
+            demo_steps_list.append(cnt)
+            
+            print(f"Completed {cnt} steps - Success: {episode_success}")
 
-        # Log priming metrics
+        # Calculate demo success statistics
+        demo_success_rate = sum(demo_successes) / len(demo_successes) * 100 if demo_successes else 0
+        demo_avg_steps_all = sum(demo_steps_list) / len(demo_steps_list) if demo_steps_list else 0
+        demo_successful_steps = [demo_steps_list[i] for i in range(len(demo_successes)) if demo_successes[i] == 1]
+        demo_avg_steps_success = sum(demo_successful_steps) / len(demo_successful_steps) if demo_successful_steps else 0
+
+        # Log priming metrics with success stats
         qtable_populated = len(agent.qtable[agent.qtable.sum(axis=1) > 0])
         pid_without_extension = pid.split(".")[0]
         log_priming_metrics(pid_without_extension, total_episodes, total_steps, 
-                          priming_violations, qtable_populated)
+                          priming_violations, qtable_populated,
+                          demo_success_rate, demo_avg_steps_success, demo_avg_steps_all)
+
+        print(f"\n=== Demo {pid_without_extension} Statistics ===")
+        print(f"Demo Success Rate: {demo_success_rate:.1f}%")
+        print(f"Demo Avg Steps (All): {demo_avg_steps_all:.1f}")
+        print(f"Demo Avg Steps (Success): {demo_avg_steps_success:.1f}")
+        print(f"Priming Violations: {priming_violations}")
+        print("=" * 40 + "\n")
 
         # Save qtable
         path_to_jsons = "pipeline_primed_qtables_json"
@@ -218,8 +272,7 @@ def prime_from_demos(sock_game):
         os.makedirs(path_to_pkls, exist_ok=True)
         agent.qtable.to_json(f'{path_to_jsons}/{pid_without_extension}_pipeline_primed_qtable.json')
         save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
-        print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")       
-
+        print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")
 
 # PERFORMING FROM PRIMED QTABLES / EVALUATION
 

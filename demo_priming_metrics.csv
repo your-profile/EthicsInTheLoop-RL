@@ -1,4 +1,4 @@
-demo_name,total_episodes,total_steps,avg_steps_per_episode,priming_violations,violations_per_step,qtable_states_populated,timestamp
-5G_Demonstration,5,874,174.8,15,0.017162471395881007,86528,2025-12-07 20:55:56.878139
-10B_Demonstration,10,1858,185.8,54,0.02906350914962325,86528,2025-12-07 20:56:04.775575
-10G_Demonstration,10,1677,167.7,0,0.0,86528,2025-12-07 20:56:09.362790
+demo_name,total_episodes,total_steps,avg_steps_per_episode,priming_violations,violations_per_step,qtable_states_populated,demo_success_rate,demo_avg_steps_success,demo_avg_steps_all,timestamp
+5G_Demonstration,5,874,174.8,15,0.017162471395881007,86528,100.0,174.8,174.8,2025-12-08 10:06:20.078228
+10B_Demonstration,10,1858,185.8,54,0.02906350914962325,86528,10.0,202.0,185.8,2025-12-08 10:06:28.786101
+10G_Demonstration,10,1677,167.7,0,0.0,86528,80.0,168.5,167.7,2025-12-08 10:06:35.245378

@@ -94,7 +94,7 @@ def prime_from_demos(sock_game):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
-    agent = QLAgent(action_space, epsilon=0.01)
+    
     
     # loop through each demo in data directory
     data_dir = 'data'
@@ -104,6 +104,8 @@ def prime_from_demos(sock_game):
     
     # GO THROUGH EACH DEMO AND PRIME Q TABLE
     for pid in pids:
+        agent = QLAgent(action_space, epsilon=0.01)
+        
         print(f"Now priming with: {pid}")
         demonstration_dict = read_demos(pid)
 
@@ -116,7 +118,7 @@ def prime_from_demos(sock_game):
             state = json.loads(state)
             cnt = 0
 
-            episode_dict = demonstration_dict[0]
+            episode_dict = demonstration_dict[i]
             print(episode_dict["actions"])
 
             for step in range(demonstration_dict[i]["steps"]):
@@ -151,8 +153,8 @@ def prime_from_demos(sock_game):
         pid_without_extension = pid.split(".")[0]
         path_to_jsons = "pipeline_primed_qtables_json"
         path_to_pkls = "pipeline_primed_qtables_pkl"
-        # os.makedirs(path_to_jsons)
-        # os.makedirs(path_to_pkls)
+        os.makedirs(path_to_jsons, exist_ok=True)
+        os.makedirs(path_to_pkls, exist_ok=True)
         agent.qtable.to_json(f'{path_to_jsons}/{pid_without_extension}_pipeline_primed_qtable.json')
         save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
         print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")
@@ -226,9 +228,8 @@ def evaluate_primed_qtables_from_demos(sock_game):
         agent.qtable = pd.read_json(json_path)
         print(agent.qtable)
         print(f"Now evaluating: {qt}")
-        input()
+        # input()
         
-
         training_time = 100
         episode_length = 1000
         for i in range(training_time):

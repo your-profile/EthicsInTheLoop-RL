@@ -1,0 +1,4 @@
+demo_name,total_episodes,total_steps,avg_steps_per_episode,priming_violations,violations_per_step,qtable_states_populated,timestamp
+5G_Demonstration,5,874,174.8,15,0.017162471395881007,86528,2025-12-07 20:55:56.878139
+10B_Demonstration,10,1858,185.8,54,0.02906350914962325,86528,2025-12-07 20:56:04.775575
+10G_Demonstration,10,1677,167.7,0,0.0,86528,2025-12-07 20:56:09.362790

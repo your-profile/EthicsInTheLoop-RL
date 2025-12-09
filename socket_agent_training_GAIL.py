@@ -138,10 +138,9 @@ def is_episode_over(obs, checkpoint):
         return True
     else:
         return False
+import itertools
 
-
-# looks at primed q table and pull the most visited/highest value states. Return as state checkpoints
-def calcuate_checkpoints_from_primedQ(table, n=10):
+def calculate_checkpoints_from_primeQ(table, n=20):
 
     collapsed = np.zeros((HEIGHT, WIDTH))
     vector = [0, 0, 0, 0, 0, 0, 0]
@@ -151,38 +150,30 @@ def calcuate_checkpoints_from_primedQ(table, n=10):
     for i in range(n):
         top_checkpoints.append(vector)
 
-    # compute top5 cells
-    for x in range(HEIGHT):
-        for y in range(WIDTH):
-            cell_value = 0
-            for cart in [0, 1]:
-                for items in [0, 1]:
-                    for checkout in [0, 1]:
-                        idx = ((((x * HEIGHT + y) * 2 + cart) * 2 + items) * 2 + checkout)
+    binary_states = list(itertools.product([0,1], repeat=3))
 
-                        cell_value += table.loc[idx].sum()
+    for cart, items, checkout in binary_states:
 
+        heatmap = np.zeros((HEIGHT, WIDTH))
 
-                        vector = [idx, x, y, cart, items, checkout, cell_value]
+        for x in range(HEIGHT):
+            for y in range(WIDTH):
 
-                        # replace empty or lower checkpoints
-                        replaced = False
-                        for i, item in enumerate(top_checkpoints):
-                            if (top_checkpoints[i][1] - 3 < x < top_checkpoints[i][1]+3) and (top_checkpoints[i][2] - 3 < x < top_checkpoints[i][2]+3):
-                                if cell_value > top_checkpoints[i][-1]:
-                                    print(f"{top_checkpoints[i]} | {vector}")
-                                    top_checkpoints[i] = vector
-                                    replaced = True
-                                    break
+                idx = ((((x*HEIGHT + y)*2 + cart)*2 + items)*2 + checkout)
+                qvals = table.loc[idx].values
+                cell_value = qvals.sum()
+                vector = [idx, x, y, cart, items, checkout, cell_value]
 
-                        if not replaced:
-                            for i, item in enumerate(top_checkpoints):
-                                if (cell_value > top_checkpoints[i][-1]):
-                                    top_checkpoints[i] = vector
-                                    break
-
-            collapsed[x, y] = cell_value
-    print(top_checkpoints)
+                for i, item in enumerate(top_checkpoints):
+                    dist = 10
+                    # if (top_checkpoints[i][1] - dist < x < top_checkpoints[i][1]+dist) and (top_checkpoints[i][2] - dist < y < top_checkpoints[i][2]+dist):
+                    if cell_value > top_checkpoints[i][-1]:
+                        print(f"{top_checkpoints[i]} | {vector}")
+                        top_checkpoints[i] = vector
+                        replaced = True
+                        break
+    for c in top_checkpoints:
+            print(c)
     return top_checkpoints
 
 
@@ -317,7 +308,7 @@ def main():
     with open('primed_qtable_5G.pkl', 'rb') as file:
         primed_qtable = pickle.load(file)
 
-    checkpoints = calcuate_checkpoints_from_primedQ(primed_qtable)
+    checkpoints = calculate_checkpoints_from_primeQ(primed_qtable)
 
     # Connect to Supermarket
     HOST = '127.0.0.1'

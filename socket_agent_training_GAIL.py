@@ -141,7 +141,7 @@ def is_episode_over(obs, checkpoint):
 
 
 # looks at primed q table and pull the most visited/highest value states. Return as state checkpoints
-def calcuate_checkpoints_from_primedQ(table, n=5):
+def calcuate_checkpoints_from_primedQ(table, n=10):
 
     collapsed = np.zeros((HEIGHT, WIDTH))
     vector = [0, 0, 0, 0, 0, 0, 0]
@@ -166,13 +166,23 @@ def calcuate_checkpoints_from_primedQ(table, n=5):
                         vector = [idx, x, y, cart, items, checkout, cell_value]
 
                         # replace empty or lower checkpoints
+                        replaced = False
                         for i, item in enumerate(top_checkpoints):
-                            if cell_value > top_checkpoints[i][-1]:
-                                top_checkpoints[i] = vector
-                                break
+                            if (top_checkpoints[i][1] - 3 < x < top_checkpoints[i][1]+3) and (top_checkpoints[i][2] - 3 < x < top_checkpoints[i][2]+3):
+                                if cell_value > top_checkpoints[i][-1]:
+                                    print(f"{top_checkpoints[i]} | {vector}")
+                                    top_checkpoints[i] = vector
+                                    replaced = True
+                                    break
+
+                        if not replaced:
+                            for i, item in enumerate(top_checkpoints):
+                                if (cell_value > top_checkpoints[i][-1]):
+                                    top_checkpoints[i] = vector
+                                    break
 
             collapsed[x, y] = cell_value
-
+    print(top_checkpoints)
     return top_checkpoints
 
 
@@ -304,7 +314,7 @@ def main():
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
     
-    with open('primed_qtable.pkl', 'rb') as file:
+    with open('primed_qtable_5G.pkl', 'rb') as file:
         primed_qtable = pickle.load(file)
 
     checkpoints = calcuate_checkpoints_from_primedQ(primed_qtable)

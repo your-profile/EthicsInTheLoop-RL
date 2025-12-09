@@ -95,21 +95,21 @@ def save_qtable(agent, filename="qtable.pkl"):
 def initialize_csv_files():
     """Initialize CSV files with headers"""
     # Demo priming metrics
-    with open('demo_priming_metrics.csv', 'w', newline='') as f:
+    with open('./eval/demo_priming_metrics.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['demo_name', 'total_episodes', 'total_steps', 'avg_steps_per_episode', 
                         'priming_violations', 'violations_per_step', 'qtable_states_populated',
                         'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp'])
     
     # Evaluation results 
-    with open('evaluation_results.csv', 'w', newline='') as f:
+    with open('./eval/evaluation_results.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['demo_name', 'eval_run', 'episode_num', 'success', 'steps_taken', 
                         'violations', 'has_basket_step', 'has_items_step', 'has_checkout_step', 
                         'final_position_x', 'final_position_y', 'timestamp'])
     
     # Summary statistics
-    with open('summary_statistics.csv', 'w', newline='') as f:
+    with open('./eval/summary_statistics.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['demo_name', 'success_rate', 'avg_steps_success', 'avg_steps_all', 
                         'total_violations_eval', 'violation_rate_eval', 'violation_rate_demo', 
@@ -118,7 +118,7 @@ def initialize_csv_files():
 def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count, qtable_size, 
                        demo_success_rate, demo_avg_steps_success, demo_avg_steps_all):
     """Log metrics from the priming phase"""
-    with open('demo_priming_metrics.csv', 'a', newline='') as f:
+    with open('./eval/demo_priming_metrics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         avg_steps = total_steps / total_episodes if total_episodes > 0 else 0
         violation_rate = violations_count / total_steps if total_steps > 0 else 0
@@ -130,7 +130,7 @@ def log_evaluation_episode(demo_name, eval_run, episode_num, success, steps_take
                           violations, has_basket_step, has_items_step, has_checkout_step,
                           final_pos_x, final_pos_y):
     """Log individual episode results during evaluation"""
-    with open('evaluation_results.csv', 'a', newline='') as f:
+    with open('./eval/evaluation_results.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([demo_name, eval_run, episode_num, success, steps_taken, 
                         violations, has_basket_step, has_items_step, has_checkout_step,
@@ -139,7 +139,7 @@ def log_evaluation_episode(demo_name, eval_run, episode_num, success, steps_take
 def log_summary_statistics(demo_name, success_rate, avg_steps_success, avg_steps_all,
                           total_violations, violation_rate_eval, violation_rate_demo):
     """Log summary statistics for a demo"""
-    with open('summary_statistics.csv', 'a', newline='') as f:
+    with open('./eval/summary_statistics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         improvement = ((violation_rate_demo - violation_rate_eval) / violation_rate_demo * 100) if violation_rate_demo > 0 else 0
         writer.writerow([demo_name, success_rate, avg_steps_success, avg_steps_all,
@@ -156,7 +156,7 @@ def prime_from_demos(sock_game):
     print(f"All Demos: {pids}")
     
     for pid in pids:
-        agent = QLAgent(action_space, epsilon=0.01)
+        agent = QLAgent(action_space, epsilon=0.0)
         
         print(f"Now priming with: {pid}")
         demonstration_dict = read_demos(pid)
@@ -289,7 +289,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
     # qtables = ['10G_Demonstration_pipeline_primed_qtable.json']
     
     for qt in qtables:
-        agent = QLAgent(action_space)
+        agent = QLAgent(action_space, epsilon=0.0)
         json_path = f"./{json_dir}/{qt}"
         agent.qtable = pd.read_json(json_path)
         
@@ -297,7 +297,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
         print(f"Now evaluating: {demo_name}")
         
         # Metrics tracking
-        num_eval_runs = 100
+        num_eval_runs = 5
         episode_length = 1000
         successes = []
         steps_list = []
@@ -317,27 +317,6 @@ def evaluate_primed_qtables_from_demos(sock_game):
             
             while not state['gameOver']:
                 cnt += 1
-                
-                shopping_list = set(state['observation']['players'][0]['shopping_list'])
-                selected_items = []
-                purchased_items = []
-
-                if len(state['observation']['baskets']) > 0:
-                    basket_list = set(state['observation']['baskets'][0]['contents'])
-                    purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
-                    selected_items = shopping_list.difference(basket_list)
-                    purchased_items = shopping_list.difference(purchased_list)
-
-                has_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
-                has_items = len(state['observation']['baskets'][0]['contents']) if len(state['observation']['baskets']) > 0 else 0
-                has_checkout = len(state['observation']['baskets'][0]['purchased_contents']) if len(state['observation']['baskets']) > 0 else 0
-
-                if has_basket >= 1 and has_basket_step == -1:
-                    has_basket_step = cnt
-                if has_items > 0 and has_items_step == -1:
-                    has_items_step = cnt
-                if has_checkout > 0 and has_checkout_step == -1:
-                    has_checkout_step = cnt
                     
                 # Choose action
                 action_index = agent.choose_action(agent.trans(state))
@@ -360,7 +339,28 @@ def evaluate_primed_qtables_from_demos(sock_game):
                     violation_count = len(next_state['violations']) if isinstance(next_state['violations'], list) else 1
                     episode_violations += violation_count
                     total_violations += violation_count
+                
+                shopping_list = set(state['observation']['players'][0]['shopping_list'])
+                selected_items = []
+                purchased_items = []
 
+                if len(state['observation']['baskets']) > 0:
+                    basket_list = set(state['observation']['baskets'][0]['contents'])
+                    purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
+                    selected_items = shopping_list.difference(basket_list)
+                    purchased_items = shopping_list.difference(purchased_list)
+
+                has_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
+                has_items = len(state['observation']['baskets'][0]['contents']) if len(state['observation']['baskets']) > 0 else 0
+                has_checkout = len(state['observation']['baskets'][0]['purchased_contents']) if len(state['observation']['baskets']) > 0 else 0
+
+                if has_basket >= 1 and has_basket_step == -1:
+                    has_basket_step = cnt
+                if has_items > 0 and has_items_step == -1:
+                    has_items_step = cnt
+                if has_checkout > 0 and has_checkout_step == -1:
+                    has_checkout_step = cnt
+                    
                 state = next_state
 
                 if cnt >= episode_length:

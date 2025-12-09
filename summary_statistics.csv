@@ -1,4 +1,0 @@
-demo_name,success_rate,avg_steps_success,avg_steps_all,total_violations_eval,violation_rate_eval,violation_rate_demo,improvement_ratio,timestamp
-5G_Demonstration,0.0,0,1000.0,0,0.0,0.017162471395881007,100.0,2025-12-08 10:13:25.098317
-10B_Demonstration,0.0,0,1000.0,14900,0.149,0.02906350914962325,-412.6703703703704,2025-12-08 10:19:19.635513
-10G_Demonstration,0.0,0,1000.0,0,0.0,0.0,0,2025-12-08 10:26:04.776603

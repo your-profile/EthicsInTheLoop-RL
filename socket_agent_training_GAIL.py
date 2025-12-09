@@ -212,7 +212,7 @@ def collect_policy_trajectories(sock_game, policy, checkpoint, steps=800):
     return np.array(obs_list), np.array(action_list)
 
 # traininf loop
-def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10, save_dir="gail_output", lr = 3e-4, ):
+def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10, save_dir="gail_output", disc_lr = 3e-4, gen_lr = 2e-4):
     #TODO: hard code obs space size and action space size
     obs_dim = 5
     act_dim = 7
@@ -221,8 +221,8 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10
     policy = Generator(obs_dim, act_dim)
     discr = Discriminator(obs_dim, act_dim)
 
-    opt_policy = optim.Adam(policy.parameters(), lr=lr)
-    opt_discr = optim.Adam(discr.parameters(), lr=lr)
+    opt_policy = optim.Adam(policy.parameters(), lr=gen_lr)
+    opt_discr = optim.Adam(discr.parameters(), lr=disc_lr)
 
     # expert_obs_t = torch.tensor(expert_obs, dtype=torch.float32)
 
@@ -279,7 +279,7 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10
         policy_loss.backward()
         opt_policy.step()
 
-        if it % 50 == 0:
+        if it % 25 == 0:
             print(f"Iteration {it} | Discriminator Loss: {discr_loss.item():.3f} | Generator Loss: {policy_loss.item():.3f}")
 
     # saving outputs

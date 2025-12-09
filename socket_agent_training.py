@@ -99,7 +99,7 @@ if __name__ == "__main__":
         state = json.loads(state)
         cnt = 0
 
-        episode_dict = demonstration_dict[0]
+        episode_dict = demonstration_dict[i]
         print(episode_dict["actions"])
 
         for step in range(demonstration_dict[i]["steps"]):

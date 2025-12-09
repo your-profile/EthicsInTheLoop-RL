@@ -306,6 +306,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
         steps_list = []
         total_violations = 0
         
+        
         for eval_run in range(num_eval_runs):
             sock_game.send(str.encode("0 RESET"))
             state = recv_socket_data(sock_game)

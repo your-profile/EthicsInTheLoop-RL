@@ -201,6 +201,8 @@ def collect_policy_trajectories(sock_game, policy, checkpoint, steps=800):
         obs = state_to_obs(state)
         done = is_episode_over(obs, checkpoint) # determines if an episode has ended from the obs vector
 
+        state = json.loads((next_state).decode('utf-8')) # decode from byte string
+
         if done:
             sock_game.send(str.encode("0 RESET"))  # reset the game
             state = recv_socket_data(sock_game)

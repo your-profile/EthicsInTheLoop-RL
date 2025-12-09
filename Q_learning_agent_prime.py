@@ -20,7 +20,7 @@ class QLAgent:
         num_states = self.height*self.width*2*2*2
         self.qtable = pd.DataFrame(np.random.rand(num_states, action_space), columns=list(range(action_space)))
 
-    def trans(self, state, verbose=False):
+    def trans(self, state, verbose=False, return_checks=False):
 
         shopping_list = set(state['observation']['players'][0]['shopping_list'])
         selected_items = []
@@ -66,7 +66,10 @@ class QLAgent:
         idx = ((((player_x*self.height + player_y)*2 + has_basket)*2 + has_items)*2 + has_checkout)
         print(f"Has Basket: {has_basket}, Has Items: {has_items}, Has Checked Out: {has_checkout}")
 
-        return idx
+        if return_checks:
+            return idx, [has_basket, has_items, has_checkout]
+        else:
+            return idx
 
     def learning(self, action, rwd, state, next_state):
         td_error = rwd + self.gamma * np.max(self.qtable.loc[next_state]) - self.qtable.loc[state, action]
@@ -85,6 +88,6 @@ class QLAgent:
         else:
             action = np.argmax(self.qtable.loc[state])
 
-        self.epsilon -= 0.005
+        self.epsilon = max(0.0, self.epsilon - 0.005)
 
         return action

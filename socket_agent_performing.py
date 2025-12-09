@@ -19,7 +19,7 @@ if __name__ == "__main__":
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
-    agent = QLAgent(action_space)
+    agent = QLAgent(action_space, epsilon=0.0)
     agent.qtable = pd.read_json('primed_qtable.json')
 
     
@@ -55,23 +55,11 @@ if __name__ == "__main__":
 
             next_state = json.loads(next_state)
 
-            # Define the reward based on the state and next_state
-            # reward = calculate_reward(state, next_state)  # You need to define this function
-
-            # if state['observation']['players'][0]['position'][0] < 0.4:
-            #     print("------------------------------------------")
-            #     print(reward, action_commands[action_index])
-            #     print("------------------------------------------")
-            # Update Q-table
-            # agent.learning(action_index, reward, agent.trans(state), agent.trans(next_state))
-
             # Update state
             state = next_state
-            # agent.qtable.to_json('qtable_2.json')
 
             if cnt >= episode_length:
                 break
-        # Additional code for end of episode if needed
 
     # Close socket connection
     sock_game.close()

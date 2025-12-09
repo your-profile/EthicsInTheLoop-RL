@@ -156,7 +156,7 @@ def prime_from_demos(sock_game):
     print(f"All Demos: {pids}")
     
     for pid in pids:
-        agent = QLAgent(action_space, epsilon=0.0)
+        agent_prime = QLAgent(action_space, epsilon=0.0)
         
         print(f"Now priming with: {pid}")
         demonstration_dict = read_demos(pid)
@@ -192,6 +192,21 @@ def prime_from_demos(sock_game):
                 
                 action_index = episode_dict["actions"][step]
                 action = "0 " + action_commands[action_index]
+                # sock_game.send(str.encode(action))
+                # next_state_raw = recv_socket_data(sock_game)
+
+                # if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))):
+                #     sock_game.send(str.encode(action))
+                #     next_state_raw = recv_socket_data(sock_game)
+
+                # if not next_state_raw:
+                #     break
+
+                # next_state = json.loads(next_state_raw)
+
+                # if next_state.get('observation', {}).get('players', [])[0].get('position', [])[0] < 0.3:
+                #     break
+
                 sock_game.send(str.encode(action))
                 next_state = recv_socket_data(sock_game)
                 
@@ -208,20 +223,9 @@ def prime_from_demos(sock_game):
                 if 'violations' in next_state and next_state['violations'] != '':
                     priming_violations += len(next_state['violations']) if isinstance(next_state['violations'], list) else 1
 
-                # Track progress milestones
-                shopping_list = set(next_state['observation']['players'][0]['shopping_list'])
-                selected_items = []
-                purchased_items = []
+                _, ar = agent_prime.trans(next_state, return_checks=True)
 
-                if len(next_state['observation']['baskets']) > 0:
-                    basket_list = set(next_state['observation']['baskets'][0]['contents'])
-                    purchased_list = set(next_state['observation']['baskets'][0]['purchased_contents'])
-                    selected_items = shopping_list.difference(basket_list)
-                    purchased_items = shopping_list.difference(purchased_list)
-
-                has_basket = int(next_state['observation']['players'][0]['curr_basket'] + 1)
-                has_items = len(next_state['observation']['baskets'][0]['contents']) if len(next_state['observation']['baskets']) > 0 else 0
-                has_checkout = len(next_state['observation']['baskets'][0]['purchased_contents']) if len(next_state['observation']['baskets']) > 0 else 0
+                has_basket, has_items, has_checkout = ar
 
                 # Record when milestones are reached
                 if has_basket >= 1 and has_basket_step == -1:
@@ -231,8 +235,8 @@ def prime_from_demos(sock_game):
                 if has_checkout > 0 and has_checkout_step == -1:
                     has_checkout_step = cnt
 
-                priming_value = 30
-                agent.priming(action_index, priming_value, agent.trans(state), agent.trans(next_state))
+                priming_value = 20
+                agent_prime.priming(action_index, priming_value, agent_prime.trans(state), agent_prime.trans(next_state))
                 state = next_state
 
                 if cnt >= episode_dict["steps"] - 1:
@@ -252,7 +256,7 @@ def prime_from_demos(sock_game):
         demo_avg_steps_success = sum(demo_successful_steps) / len(demo_successful_steps) if demo_successful_steps else 0
 
         # Log priming metrics with success stats
-        qtable_populated = len(agent.qtable[agent.qtable.sum(axis=1) > 0])
+        qtable_populated = len(agent_prime.qtable[agent_prime.qtable.sum(axis=1) > 0])
         pid_without_extension = pid.split(".")[0]
         log_priming_metrics(pid_without_extension, total_episodes, total_steps, 
                           priming_violations, qtable_populated,
@@ -270,8 +274,10 @@ def prime_from_demos(sock_game):
         path_to_pkls = "pipeline_primed_qtables_pkl"
         os.makedirs(path_to_jsons, exist_ok=True)
         os.makedirs(path_to_pkls, exist_ok=True)
-        agent.qtable.to_json(f'{path_to_jsons}/{pid_without_extension}_pipeline_primed_qtable.json')
-        save_qtable(agent, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
+        
+        # Save qtable as pickle (preserve exact in-memory type)
+        agent_prime.qtable.to_json(f'{path_to_jsons}/{pid_without_extension}_pipeline_primed_qtable.json')
+        save_qtable(agent_prime, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
         print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")
 
 # PERFORMING FROM PRIMED QTABLES / EVALUATION
@@ -284,10 +290,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
     p = Path(json_dir)
     qtables = [entry.name for entry in p.iterdir() if entry.is_file()]
     print(f"Evaluating the following primed qtables: {qtables}")
-    
-    # For debugging - comment out to run all
-    # qtables = ['10G_Demonstration_pipeline_primed_qtable.json']
-    
+        
     for qt in qtables:
         agent = QLAgent(action_space, epsilon=0.0)
         json_path = f"./{json_dir}/{qt}"
@@ -323,16 +326,33 @@ def evaluate_primed_qtables_from_demos(sock_game):
                 action = "0 " + action_commands[action_index]
 
                 sock_game.send(str.encode(action))
-                next_state = recv_socket_data(sock_game)
-                
-                if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
-                    sock_game.send(str.encode(action))
-                    next_state = recv_socket_data(sock_game)
-                
-                if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
-                    break 
+                next_state_raw = recv_socket_data(sock_game)
 
-                next_state = json.loads(next_state)
+                if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))):
+                    sock_game.send(str.encode(action))
+                    next_state_raw = recv_socket_data(sock_game)
+
+                if not next_state_raw:
+                    break
+
+                next_state = json.loads(next_state_raw)
+
+                # Use next_state for position/termination checks
+                if next_state.get('observation', {}).get('players', [])[0].get('position', [])[0] < 0.3:
+                    break
+
+
+                # sock_game.send(str.encode(action))
+                # next_state = recv_socket_data(sock_game)
+                
+                # if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
+                #     sock_game.send(str.encode(action))
+                #     next_state = recv_socket_data(sock_game)
+                
+                # if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
+                #     break 
+
+                # next_state = json.loads(next_state)
                 
                 # Count violations
                 if 'violations' in next_state and next_state['violations'] != '':
@@ -340,19 +360,9 @@ def evaluate_primed_qtables_from_demos(sock_game):
                     episode_violations += violation_count
                     total_violations += violation_count
                 
-                shopping_list = set(state['observation']['players'][0]['shopping_list'])
-                selected_items = []
-                purchased_items = []
+                _, ar = agent.trans(next_state, return_checks=True)
 
-                if len(state['observation']['baskets']) > 0:
-                    basket_list = set(state['observation']['baskets'][0]['contents'])
-                    purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
-                    selected_items = shopping_list.difference(basket_list)
-                    purchased_items = shopping_list.difference(purchased_list)
-
-                has_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
-                has_items = len(state['observation']['baskets'][0]['contents']) if len(state['observation']['baskets']) > 0 else 0
-                has_checkout = len(state['observation']['baskets'][0]['purchased_contents']) if len(state['observation']['baskets']) > 0 else 0
+                has_basket, has_items, has_checkout = ar
 
                 if has_basket >= 1 and has_basket_step == -1:
                     has_basket_step = cnt
@@ -360,10 +370,11 @@ def evaluate_primed_qtables_from_demos(sock_game):
                     has_items_step = cnt
                 if has_checkout > 0 and has_checkout_step == -1:
                     has_checkout_step = cnt
-                    
+
                 state = next_state
 
                 if cnt >= episode_length:
+                    print("POSI", state['observation']['players'][0]['position'][0])
                     break
             
             # Determine success
@@ -391,7 +402,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
         # Get demo violation rate from priming metrics
         violation_rate_demo = 0
         try:
-            with open('demo_priming_metrics.csv', 'r') as f:
+            with open('./eval/demo_priming_metrics.csv', 'r') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row['demo_name'] == demo_name:

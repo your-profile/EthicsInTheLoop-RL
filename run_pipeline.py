@@ -95,25 +95,28 @@ def save_qtable(agent, filename="qtable.pkl"):
 def initialize_csv_files():
     """Initialize CSV files with headers"""
     # Demo priming metrics
-    with open('./eval/demo_priming_metrics.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['demo_name', 'total_episodes', 'total_steps', 'avg_steps_per_episode', 
-                        'priming_violations', 'violations_per_step', 'qtable_states_populated',
-                        'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp'])
-    
-    # Evaluation results 
-    with open('./eval/evaluation_results.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['demo_name', 'eval_run', 'episode_num', 'success', 'steps_taken', 
-                        'violations', 'has_basket_step', 'has_items_step', 'has_checkout_step', 
-                        'final_position_x', 'final_position_y', 'timestamp'])
+    if not os.path.exists('./eval/demo_priming_metrics.csv'):
+        with open('./eval/demo_priming_metrics.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['demo_name', 'total_episodes', 'total_steps', 'avg_steps_per_episode',
+                            'priming_violations', 'violations_per_step', 'qtable_states_populated',
+                            'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp'])
+
+    # Evaluation results
+    if not os.path.exists('./eval/evaluation_results.csv'):
+        with open('./eval/evaluation_results.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['demo_name', 'eval_run', 'episode_num', 'success', 'steps_taken',
+                            'violations', 'has_basket_step', 'has_items_step', 'has_checkout_step',
+                            'final_position_x', 'final_position_y', 'timestamp'])
     
     # Summary statistics
-    with open('./eval/summary_statistics.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['demo_name', 'success_rate', 'avg_steps_success', 'avg_steps_all', 
-                        'total_violations_eval', 'violation_rate_eval', 'violation_rate_demo', 
-                        'improvement_ratio', 'timestamp'])
+    if not os.path.exists('./eval/summary_statistics.csv'):
+        with open('./eval/summary_statistics.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['demo_name', 'success_rate', 'avg_steps_success', 'avg_steps_all',
+                            'total_violations_eval', 'violation_rate_eval', 'violation_rate_demo',
+                            'improvement_ratio', 'timestamp'])
 
 def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count, qtable_size, 
                        demo_success_rate, demo_avg_steps_success, demo_avg_steps_all):

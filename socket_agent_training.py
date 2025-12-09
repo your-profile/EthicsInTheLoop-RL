@@ -130,7 +130,7 @@ if __name__ == "__main__":
         
         print(cnt)
 
-    agent.qtable.to_json('primed_qtable_{}.json'.format(pid))
+    agent.qtable.to_json('primed_qtable.json')
     save_qtable(agent)
 
     input("Enter to go to Training: ")

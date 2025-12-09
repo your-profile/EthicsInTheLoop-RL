@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import random
 # import torch.nn.functional as F
 # import json  # Import json for dictionary serialization
 
@@ -86,7 +87,16 @@ class QLAgent:
         if rand < self.epsilon:
             action = np.random.choice(range(self.action_space))
         else:
-            action = np.argmax(self.qtable.loc[state])
+            # action = np.argmax(self.qtable.loc[state])
+            state_array = self.qtable.loc[state].astype(float).copy()
+            summ = state_array.sum()
+
+            if summ == 0:
+                weights = [1/7] * 7
+            else:
+                weights = (state_array / summ).tolist()
+
+            action = random.choices(range(7), weights=weights, k=1)[0]
 
         self.epsilon = max(0.0, self.epsilon - 0.005)
 

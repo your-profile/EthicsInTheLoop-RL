@@ -243,7 +243,7 @@ def prime_from_demos(sock_game):
                     break
             
             # Determine success for this demo episode
-            episode_success = (has_basket_step != -1 and has_items_step != -1 and has_checkout_step != -1)
+            episode_success = (has_basket_step != -1 and has_items_step == -1 and has_checkout_step != -1)
             demo_successes.append(1 if episode_success else 0)
             demo_steps_list.append(cnt)
             

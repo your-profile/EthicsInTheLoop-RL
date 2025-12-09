@@ -112,37 +112,43 @@ expert_actions = [0,6,3]
 '''
 def split_demonstrations(dictionary):
 
-    expert_obs, expert_actions = [], []
+    binary_states = list(itertools.product([0,1], repeat=3))
+
+    expert = {}
+
+    for key in range(len(binary_states)):
+        expert[key]= {}
+        expert[key]["obs"] = []
+        expert[key]["actions"] = []
+
 
     for i in range (len(dictionary)):
         states = dictionary[i]['states']
-        for state in states[1:]:
+        for (state, action) in zip(states[1:], dictionary[i]['actions']):
             state_array = state_to_obs(state)
-            expert_obs.append(state_array)
-        for action in dictionary[i]['actions']:
-            expert_actions.append(action)
+            _, _, f, t, o = state_array
+            key = 4*f + 2*t + 1*o
+            expert[key]['obs'].append(state_array)
+            expert[key]['actions'].append(action)
 
-    print(len(expert_obs), len(expert_actions))
 
-    try:
-        assert(len(expert_obs) == len(expert_actions))
-    except:
-        AssertionError("Misaligned State and Actions")
     
-    return expert_obs, expert_actions
+    
+    for key in expert.keys():
+        assert(len(expert[key]["obs"]) == len(expert[key]["actions"]))
+    
+    return expert
 
 # Checks if the observation matches the current checkpoint and returns true if it does. Otherwise returns false
 def is_episode_over(obs, checkpoint):
     
-    if np.array_equal(obs, checkpoint):
+    if np.array_equal(obs, checkpoint[1:6]):
         return True
     else:
         return False
 import itertools
 
-def calculate_checkpoints_from_primeQ(table, n=20):
-
-    collapsed = np.zeros((HEIGHT, WIDTH))
+def calculate_checkpoints_from_primeQ(table, n=6):
     vector = [0, 0, 0, 0, 0, 0, 0]
     top_checkpoints = []
 
@@ -153,9 +159,6 @@ def calculate_checkpoints_from_primeQ(table, n=20):
     binary_states = list(itertools.product([0,1], repeat=3))
 
     for cart, items, checkout in binary_states:
-
-        heatmap = np.zeros((HEIGHT, WIDTH))
-
         for x in range(HEIGHT):
             for y in range(WIDTH):
 
@@ -164,16 +167,27 @@ def calculate_checkpoints_from_primeQ(table, n=20):
                 cell_value = qvals.sum()
                 vector = [idx, x, y, cart, items, checkout, cell_value]
 
+                dist = 3
+                replaced = False
+                near_any = False
+
                 for i, item in enumerate(top_checkpoints):
-                    dist = 10
-                    # if (top_checkpoints[i][1] - dist < x < top_checkpoints[i][1]+dist) and (top_checkpoints[i][2] - dist < y < top_checkpoints[i][2]+dist):
-                    if cell_value > top_checkpoints[i][-1]:
-                        print(f"{top_checkpoints[i]} | {vector}")
-                        top_checkpoints[i] = vector
-                        replaced = True
+                    _, cx, cy, _, _, _, old_value = item 
+                    if (cx - dist) < x < (cx + dist) and (cy - dist) < y < (cy + dist):
+                        near_any = True
+                        if cell_value > old_value:
+                            # print(f"{top_checkpoints[i]} | {vector}")
+                            top_checkpoints[i] = vector
+                            replaced = True
                         break
-    for c in top_checkpoints:
-            print(c)
+
+                if not replaced and not near_any:
+                    lowest_index = min(range(len(top_checkpoints)),
+                                    key=lambda j: top_checkpoints[j][-1])
+
+                    if cell_value > top_checkpoints[lowest_index][-1]:
+                        top_checkpoints[lowest_index] = vector
+
     return top_checkpoints
 
 
@@ -202,7 +216,7 @@ def collect_policy_trajectories(sock_game, policy, checkpoint, steps=800):
         obs = state_to_obs(state)
         done = is_episode_over(obs, checkpoint) # determines if an episode has ended from the obs vector
 
-        state = json.loads((next_state).decode('utf-8')) # decode from byte string
+        state = json.loads((next_state))
 
         if done:
             sock_game.send(str.encode("0 RESET"))  # reset the game
@@ -330,13 +344,16 @@ def main():
     #TODO: create a feature vector representation of our states
     # Then separate these observations and actions
 
-    expert_obs, expert_actions = split_demonstrations(demonstration_dict)
+    expert_dict = split_demonstrations(demonstration_dict)
 
-    np.save(os.path.join("outputGail", f"expert_obs.npy"), expert_obs, allow_pickle=True)
-    np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions, allow_pickle=True)
+    # np.save(os.path.join("outputGail", f"expert_obs.npy"), expert_obs, allow_pickle=True)
+    # np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions, allow_pickle=True)
 
     for i, checkpoint in enumerate(checkpoints):
-        policy, discr = train_gail(sock_game, expert_obs, expert_actions, iterations=800, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)
+        print("Checkpoint: ", i)
+        _, _, _, f, t, o, _ = checkpoint
+        key = 4*f + t*2 + o*1
+        policy, discr = train_gail(sock_game, expert_dict[key]["obs"], expert_dict[key]["actions"], iterations=200, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)
 
 if __name__ == "__main__":
     main()

@@ -224,8 +224,15 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10
     opt_policy = optim.Adam(policy.parameters(), lr=lr)
     opt_discr = optim.Adam(discr.parameters(), lr=lr)
 
-    expert_obs_t = torch.tensor(expert_obs, dtype=torch.float32)
-    expert_act_onehot = torch.tensor([one_hot(a, act_dim) for a in expert_actions], dtype=torch.float32)
+    # expert_obs_t = torch.tensor(expert_obs, dtype=torch.float32)
+
+    expert_obs_array = np.array(expert_obs)
+    expert_obs_t = torch.tensor(expert_obs_array, dtype=torch.float32)
+
+    # expert_act_onehot = torch.tensor([one_hot(a, act_dim) for a in expert_actions], dtype=torch.float32)
+
+    expert_act_onehot_array = np.array([one_hot(a, act_dim) for a in expert_actions])
+    expert_act_onehot = torch.tensor(expert_act_onehot_array, dtype=torch.float32)
 
     # create directory for results
     os.makedirs(save_dir, exist_ok=True)
@@ -234,7 +241,11 @@ def train_gail(env, expert_obs, expert_actions, checkpoint, index, iterations=10
         # policy rollouts
         policy_obs, policy_actions = collect_policy_trajectories(env, policy, checkpoint)
         policy_obs_tensor = torch.tensor(policy_obs, dtype=torch.float32)
-        policy_action_onehot = torch.tensor([one_hot(a, act_dim) for a in policy_actions], dtype=torch.float32)
+        
+        # policy_action_onehot = torch.tensor([one_hot(a, act_dim) for a in policy_actions], dtype=torch.float32)
+        policy_action_onehot_array = np.array([one_hot(a, act_dim) for a in policy_actions])
+        policy_action_onehot = torch.tensor(policy_action_onehot_array, dtype=torch.float32)
+
         policy_action_tensor = torch.tensor(policy_actions, dtype=torch.long)
 
         # trainig discriminator

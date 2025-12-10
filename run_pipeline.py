@@ -302,7 +302,7 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
         print(f"Now evaluating: {demo_name}")
         
         # Metrics tracking
-        num_eval_runs = 5
+        num_eval_runs = 20
         episode_length = 1000
         successes = []
         steps_list = []

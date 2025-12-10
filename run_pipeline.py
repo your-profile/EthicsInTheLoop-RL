@@ -100,7 +100,7 @@ def initialize_csv_files():
             writer = csv.writer(f)
             writer.writerow(['demo_name', 'total_episodes', 'total_steps', 'avg_steps_per_episode',
                             'priming_violations', 'violations_per_step', 'qtable_states_populated',
-                            'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp'])
+                            'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp', 'priming_value'])
 
     # Evaluation results
     if not os.path.exists('./eval/evaluation_results.csv'):
@@ -108,7 +108,7 @@ def initialize_csv_files():
             writer = csv.writer(f)
             writer.writerow(['demo_name', 'eval_run', 'episode_num', 'success', 'steps_taken',
                             'violations', 'has_basket_step', 'has_items_step', 'has_checkout_step',
-                            'final_position_x', 'final_position_y', 'timestamp'])
+                            'final_position_x', 'final_position_y', 'timestamp', 'priming_value'])
     
     # Summary statistics
     if not os.path.exists('./eval/summary_statistics.csv'):
@@ -116,10 +116,10 @@ def initialize_csv_files():
             writer = csv.writer(f)
             writer.writerow(['demo_name', 'success_rate', 'avg_steps_success', 'avg_steps_all',
                             'total_violations_eval', 'violation_rate_eval', 'violation_rate_demo',
-                            'improvement_ratio', 'timestamp'])
+                            'improvement_ratio', 'timestamp','priming_value'])
 
 def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count, qtable_size, 
-                       demo_success_rate, demo_avg_steps_success, demo_avg_steps_all):
+                       demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, priming_value):
     """Log metrics from the priming phase"""
     with open('./eval/demo_priming_metrics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
@@ -127,29 +127,29 @@ def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count
         violation_rate = violations_count / total_steps if total_steps > 0 else 0
         writer.writerow([demo_name, total_episodes, total_steps, avg_steps, 
                         violations_count, violation_rate, qtable_size,
-                        demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, datetime.now()])
+                        demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, datetime.now(), priming_value])
 
 def log_evaluation_episode(demo_name, eval_run, episode_num, success, steps_taken, 
                           violations, has_basket_step, has_items_step, has_checkout_step,
-                          final_pos_x, final_pos_y):
+                          final_pos_x, final_pos_y, priming_value):
     """Log individual episode results during evaluation"""
     with open('./eval/evaluation_results.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([demo_name, eval_run, episode_num, success, steps_taken, 
                         violations, has_basket_step, has_items_step, has_checkout_step,
-                        final_pos_x, final_pos_y, datetime.now()])
+                        final_pos_x, final_pos_y, datetime.now(), priming_value])
 
 def log_summary_statistics(demo_name, success_rate, avg_steps_success, avg_steps_all,
-                          total_violations, violation_rate_eval, violation_rate_demo):
+                          total_violations, violation_rate_eval, violation_rate_demo, priming_value):
     """Log summary statistics for a demo"""
     with open('./eval/summary_statistics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         improvement = ((violation_rate_demo - violation_rate_eval) / violation_rate_demo * 100) if violation_rate_demo > 0 else 0
         writer.writerow([demo_name, success_rate, avg_steps_success, avg_steps_all,
                         total_violations, violation_rate_eval, violation_rate_demo,
-                        improvement, datetime.now()])
+                        improvement, datetime.now(), priming_value])
 
-def prime_from_demos(sock_game):
+def prime_from_demos(sock_game, priming_value):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     action_space = len(action_commands) - 1
     
@@ -238,7 +238,6 @@ def prime_from_demos(sock_game):
                 if has_checkout > 0 and has_checkout_step == -1:
                     has_checkout_step = cnt
 
-                priming_value = 20
                 agent_prime.priming(action_index, priming_value, agent_prime.trans(state), agent_prime.trans(next_state))
                 state = next_state
 
@@ -263,7 +262,7 @@ def prime_from_demos(sock_game):
         pid_without_extension = pid.split(".")[0]
         log_priming_metrics(pid_without_extension, total_episodes, total_steps, 
                           priming_violations, qtable_populated,
-                          demo_success_rate, demo_avg_steps_success, demo_avg_steps_all)
+                          demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, priming_value)
 
         print(f"\n=== Demo {pid_without_extension} Statistics ===")
         print(f"Demo Success Rate: {demo_success_rate:.1f}%")
@@ -285,7 +284,7 @@ def prime_from_demos(sock_game):
 
 # PERFORMING FROM PRIMED QTABLES / EVALUATION
 
-def evaluate_primed_qtables_from_demos(sock_game):
+def evaluate_primed_qtables_from_demos(sock_game, priming_value):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     action_space = len(action_commands) - 1
     
@@ -391,7 +390,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
             # Log this episode
             log_evaluation_episode(demo_name, 1, eval_run, success, cnt, episode_violations,
                                  has_basket_step, has_items_step, has_checkout_step,
-                                 final_pos[0], final_pos[1])
+                                 final_pos[0], final_pos[1], priming_value)
             
             if eval_run % 10 == 0:
                 print(f"  Completed {eval_run}/{num_eval_runs} episodes")
@@ -417,7 +416,7 @@ def evaluate_primed_qtables_from_demos(sock_game):
         
         # Log summary
         log_summary_statistics(demo_name, success_rate, avg_steps_success, avg_steps_all,
-                             total_violations, violation_rate_eval, violation_rate_demo)
+                             total_violations, violation_rate_eval, violation_rate_demo, priming_value)
         
         print(f"\n=== {demo_name} Summary ===")
         print(f"Success Rate: {success_rate:.1f}%")
@@ -448,8 +447,10 @@ sock_game.connect((HOST, PORT))
 initialize_csv_files()
 
 # Execute pipeline
-prime_from_demos(sock_game)
-evaluate_primed_qtables_from_demos(sock_game)
+for priming_value in [10, 20, 30]:
+    prime_from_demos(sock_game, priming_value)
+    evaluate_primed_qtables_from_demos(sock_game, priming_value)
+
 sock_game.close()
 
 print("Check the CSV files for results:")

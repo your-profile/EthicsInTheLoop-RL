@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
             next_state = json.loads(next_state)
 
-            priming_value = 20
+            priming_value = 40
             
             agent.priming(action_index, priming_value, agent.trans(state), agent.trans(next_state))
             state = next_state
@@ -161,7 +161,7 @@ if __name__ == "__main__":
             # Define the reward based on the state and next_state
             reward = calculate_reward(state, next_state)  # You need to define this function
 
-            if state['observation']['players'][0]['position'][0] < 0.4:
+            if state['observation']['players'][0]['position'][0] < 0.3:
                 print("------------------------------------------")
                 print(reward, action_commands[action_index])
                 print("------------------------------------------")

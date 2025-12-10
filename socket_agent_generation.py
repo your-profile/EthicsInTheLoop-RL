@@ -22,9 +22,9 @@ class Generator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim,32), nn.ReLU(),
-            nn.Linear(32,32), nn.ReLU(),
-            nn.Linear(32,act_dim),
+            nn.Linear(obs_dim,64), nn.ReLU(),
+            nn.Linear(64,64), nn.ReLU(),
+            nn.Linear(64,act_dim),
         )
 
     def forward(self, obs):
@@ -43,9 +43,9 @@ class Discriminator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim+act_dim,32), nn.ReLU(),
-            nn.Linear(32,32), nn.ReLU(),
-            nn.Linear(32,1),
+            nn.Linear(obs_dim+act_dim,64), nn.ReLU(),
+            nn.Linear(64,64), nn.ReLU(),
+            nn.Linear(64,1),
             nn.Sigmoid(),)
 
     def forward(self, obs, act_onehot):
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     sock_game.connect((HOST, PORT))
 
     model = Generator(5,7)
-    model.load_state_dict(torch.load("/Users/juliasantaniello/Desktop/EthicsInTheLoop-RL/outputGail/GAIL_generator_0.pth", map_location="cpu"))
+    model.load_state_dict(torch.load("/Users/juliasantaniello/Desktop/EthicsInTheLoop-RL/outputGail/GAIL_generator_3.pth", map_location="cpu"))
     model.eval()
 
     collect_policy_trajectories(sock_game=sock_game, policy=model)

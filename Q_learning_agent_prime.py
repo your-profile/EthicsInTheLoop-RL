@@ -32,8 +32,8 @@ class QLAgent:
             purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
             selected_items = shopping_list.difference(basket_list)
             purchased_items = shopping_list.difference(purchased_list)
-            print(f"Shopping List: {shopping_list}, In Basket: {basket_list}, Purchased: {purchased_list}")
-            print(f"Purchased Items: {purchased_items}, Selected Items: {selected_items}")
+            # print(f"Shopping List: {shopping_list}, In Basket: {basket_list}, Purchased: {purchased_list}")
+            # print(f"Purchased Items: {purchased_items}, Selected Items: {selected_items}")
 
 
 
@@ -65,7 +65,7 @@ class QLAgent:
 
         #encoding: ((((x,y)*2 + cart)*2 + items)*2 + checkout)
         idx = ((((player_x*self.height + player_y)*2 + has_basket)*2 + has_items)*2 + has_checkout)
-        print(f"Has Basket: {has_basket}, Has Items: {has_items}, Has Checked Out: {has_checkout}")
+        # print(f"Has Basket: {has_basket}, Has Items: {has_items}, Has Checked Out: {has_checkout}")
 
         if return_checks:
             return idx, [has_basket, has_items, has_checkout]

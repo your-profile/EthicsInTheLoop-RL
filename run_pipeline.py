@@ -8,7 +8,7 @@ done:
  - dont need second half after input("Enter to go to Training: ") - commented out because we maybe want to add back later
 # modified socket_agent_performing.py code to run on all demos 
 
-TODO
+
 # get norms broken in demo
 # get norms broken after priming 
 # get success rate 
@@ -38,47 +38,9 @@ from datetime import datetime
 cart = False
 exit_pos = [-0.8, 15.6] # The position of the exit in the environment from [-0.8, 15.6] in x, and y = 15.6
 cart_pos_left = [1, 18.5] # The position of the cart in the environment from [1, 2] in x, and y = 18.5
-cart_pos_right = [2, 18.5] 
+cart_pos_right = [2, 18.5]
 
-def distance_to_cart(state):
-    agent_position = state['observation']['players'][0]['position']
-    if agent_position[0] > 1.5:
-        cart_distances = [euclidean_distance(agent_position, cart_pos_right)]
-    else:
-        cart_distances = [euclidean_distance(agent_position, cart_pos_left)]
-    return min(cart_distances)
-
-def euclidean_distance(pos1, pos2):
-    # Calculate Euclidean distance between two points
-    return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)**0.5
-
-
-def calculate_reward(previous_state, state):
-    shopping_list = set(state['observation']['players'][0]['shopping_list'])
-    selected_items = []
-    purchased_items = []
-
-    if len(state['observation']['baskets']) > 0:
-        basket_list = set(state['observation']['baskets'][0]['contents'])
-        purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
-        selected_items = shopping_list.difference(basket_list)
-        purchased_items = shopping_list.difference(purchased_list)
-
-
-    # You should design a function to transform the huge state into a learnable state for the agent
-    # It should be simple but also contains enough information for the agent to learn
-    has_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
-    has_items = int(len(list(selected_items)))
-    has_checkout = int(len(list(purchased_items)))
-
-    if has_basket >= 1 and has_items == 0 and has_checkout == 0 and state['observation']['players'][0]['position'][0] < 0.3:
-        return 100
-
-    if state['observation']['players'][0]['position'][0] < 0.3:
-        return -10
-    
-    return -1
-
+# Reads the demos from the pickle file that contains the demos
 def read_demos(demo_filename=None):
 
     file = open('./data/{}'.format(demo_filename), 'rb')
@@ -87,14 +49,16 @@ def read_demos(demo_filename=None):
 
     return demo_dict
 
+# Saves the qtable in a pickle file
 def save_qtable(agent, filename="qtable.pkl"):
     with open(filename, "wb") as f:
         pickle.dump(agent.qtable, f)
     # print(f"Q-table saved to {filename}")
-    
+
+# initializes the csv files if they do not already exist. Otherwise, does nothing
 def initialize_csv_files():
-    """Initialize CSV files with headers"""
-    # Demo priming metrics
+
+    # Initializes Demo priming metrics
     if not os.path.exists('./eval/demo_priming_metrics.csv'):
         with open('./eval/demo_priming_metrics.csv', 'w', newline='') as f:
             writer = csv.writer(f)
@@ -102,7 +66,7 @@ def initialize_csv_files():
                             'priming_violations', 'violations_per_step', 'qtable_states_populated',
                             'demo_success_rate', 'demo_avg_steps_success', 'demo_avg_steps_all', 'timestamp', 'priming_value'])
 
-    # Evaluation results
+    # Initializes Evaluation results
     if not os.path.exists('./eval/evaluation_results.csv'):
         with open('./eval/evaluation_results.csv', 'w', newline='') as f:
             writer = csv.writer(f)
@@ -110,7 +74,7 @@ def initialize_csv_files():
                             'violations', 'has_basket_step', 'has_items_step', 'has_checkout_step',
                             'final_position_x', 'final_position_y', 'timestamp', 'priming_value'])
     
-    # Summary statistics
+    # Initializes Summary statistics
     if not os.path.exists('./eval/summary_statistics.csv'):
         with open('./eval/summary_statistics.csv', 'w', newline='') as f:
             writer = csv.writer(f)
@@ -118,9 +82,10 @@ def initialize_csv_files():
                             'total_violations_eval', 'violation_rate_eval', 'violation_rate_demo',
                             'improvement_ratio', 'timestamp','priming_value'])
 
+# Logs the metrics from the just the qtable priming
 def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count, qtable_size, 
                        demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, priming_value):
-    """Log metrics from the priming phase"""
+
     with open('./eval/demo_priming_metrics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         avg_steps = total_steps / total_episodes if total_episodes > 0 else 0
@@ -129,19 +94,22 @@ def log_priming_metrics(demo_name, total_episodes, total_steps, violations_count
                         violations_count, violation_rate, qtable_size,
                         demo_success_rate, demo_avg_steps_success, demo_avg_steps_all, datetime.now(), priming_value])
 
+# Logs the metrics per each episode from the primed qtable
 def log_evaluation_episode(demo_name, eval_run, episode_num, success, steps_taken, 
                           violations, has_basket_step, has_items_step, has_checkout_step,
                           final_pos_x, final_pos_y, priming_value):
-    """Log individual episode results during evaluation"""
+
     with open('./eval/evaluation_results.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([demo_name, eval_run, episode_num, success, steps_taken, 
                         violations, has_basket_step, has_items_step, has_checkout_step,
                         final_pos_x, final_pos_y, datetime.now(), priming_value])
 
+
+# Takes the average results for a given demonstration file's qtable and logs them
 def log_summary_statistics(demo_name, success_rate, avg_steps_success, avg_steps_all,
                           total_violations, violation_rate_eval, violation_rate_demo, priming_value):
-    """Log summary statistics for a demo"""
+
     with open('./eval/summary_statistics.csv', 'a', newline='') as f:
         writer = csv.writer(f)
         improvement = ((violation_rate_demo - violation_rate_eval) / violation_rate_demo * 100) if violation_rate_demo > 0 else 0
@@ -149,20 +117,24 @@ def log_summary_statistics(demo_name, success_rate, avg_steps_success, avg_steps
                         total_violations, violation_rate_eval, violation_rate_demo,
                         improvement, datetime.now(), priming_value])
 
+# Primes a qtable given demo files
 def prime_from_demos(sock_game, priming_value):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     action_space = len(action_commands) - 1
-    
+
     data_dir = 'data'
     p = Path(data_dir)
     pids = [entry.name for entry in p.iterdir() if entry.is_file()]
     print(f"All Demos: {pids}")
-    
+
+    # Runs this for each file in the data folder
     for pid in pids:
+
+        # Creates a new priming agent
         agent_prime = QLAgent(action_space, epsilon=0.0)
         
         print(f"Now priming with: {pid}")
-        demonstration_dict = read_demos(pid)
+        demonstration_dict = read_demos(pid) # Gets the dictionary of demonstrations from the demo file
 
         # Track metrics for this demo
         total_episodes = len(demonstration_dict.keys())
@@ -186,37 +158,30 @@ def prime_from_demos(sock_game, priming_value):
             has_items_step = -1
             has_checkout_step = -1
 
+            # Each episode within a demonstration has its own key with its own actions
             episode_dict = demonstration_dict[episode_key]
             print(f"Actions in episode: {episode_dict['actions']}")
 
+            # For each step in an episode
             for step in range(episode_dict["steps"]):
                 cnt += 1
                 total_steps += 1
-                
+
+                # gets the action taken at that step
                 action_index = episode_dict["actions"][step]
                 action = "0 " + action_commands[action_index]
-                # sock_game.send(str.encode(action))
-                # next_state_raw = recv_socket_data(sock_game)
 
-                # if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))):
-                #     sock_game.send(str.encode(action))
-                #     next_state_raw = recv_socket_data(sock_game)
-
-                # if not next_state_raw:
-                #     break
-
-                # next_state = json.loads(next_state_raw)
-
-                # if next_state.get('observation', {}).get('players', [])[0].get('position', [])[0] < 0.3:
-                #     break
-
+                # sends that action to the socket and receives the resulting state
                 sock_game.send(str.encode(action))
                 next_state = recv_socket_data(sock_game)
-                
+
+                # If the agent takes a movement in a direction but wasn't already facing that direction,
+                # take that movement again so it actually moves instead of turns
                 if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
                     sock_game.send(str.encode(action))
                     next_state = recv_socket_data(sock_game)
-                
+
+                # Ends the episode if there is no next state or the next state is close enough to the exit
                 if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
                     break 
 
@@ -238,9 +203,11 @@ def prime_from_demos(sock_game, priming_value):
                 if has_checkout > 0 and has_checkout_step == -1:
                     has_checkout_step = cnt
 
+                # primes the qtable with the priming value
                 agent_prime.priming(action_index, priming_value, agent_prime.trans(state), agent_prime.trans(next_state))
                 state = next_state
 
+                # If the episode is over
                 if cnt >= episode_dict["steps"] - 1:
                     break
             
@@ -282,8 +249,8 @@ def prime_from_demos(sock_game, priming_value):
         save_qtable(agent_prime, f'{path_to_pkls}/{pid_without_extension}_pipeline_primed_qtable.pkl')
         print(f"Saved qtable as {pid_without_extension}_pipeline_primed_qtable.json and {pid_without_extension}_pipeline_primed_qtable.pkl")
 
-# PERFORMING FROM PRIMED QTABLES / EVALUATION
 
+# PERFORMING FROM PRIMED QTABLES / EVALUATION
 def evaluate_primed_qtables_from_demos(sock_game, priming_value):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     action_space = len(action_commands) - 1
@@ -292,12 +259,16 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
     p = Path(json_dir)
     qtables = [entry.name for entry in p.iterdir() if entry.is_file()]
     print(f"Evaluating the following primed qtables: {qtables}")
-        
+
+    # For each qtable generated by the previous function
     for qt in qtables:
+
+        # create a new agent
         agent = QLAgent(action_space, epsilon=0.0)
         json_path = f"./{json_dir}/{qt}"
         agent.qtable = pd.read_json(json_path)
-        
+
+        # get the name of the demo
         demo_name = qt.replace('_pipeline_primed_qtable.json', '')
         print(f"Now evaluating: {demo_name}")
         
@@ -308,8 +279,9 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
         steps_list = []
         total_violations = 0
         
-        
+        # Runs the evaluation a set number of times determined by num_eval_runs
         for eval_run in range(num_eval_runs):
+            # Resets the state
             sock_game.send(str.encode("0 RESET"))
             state = recv_socket_data(sock_game)
             state = json.loads(state)
@@ -320,7 +292,8 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
             has_items_step = -1
             has_checkout_step = -1
             episode_violations = 0
-            
+
+            # While the agent hasn't finished
             while not state['gameOver']:
                 cnt += 1
                     
@@ -328,9 +301,12 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
                 action_index = agent.choose_action(agent.trans(state))
                 action = "0 " + action_commands[action_index]
 
+                # Sends the action to the socket
                 sock_game.send(str.encode(action))
                 next_state_raw = recv_socket_data(sock_game)
 
+                # If the agent takes a movement in a direction but wasn't already facing that direction,
+                # take that movement again so it actually moves instead of turns
                 if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))):
                     sock_game.send(str.encode(action))
                     next_state_raw = recv_socket_data(sock_game)
@@ -343,19 +319,6 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
                 # Use next_state for position/termination checks
                 if next_state.get('observation', {}).get('players', [])[0].get('position', [])[0] < 0.3:
                     break
-
-
-                # sock_game.send(str.encode(action))
-                # next_state = recv_socket_data(sock_game)
-                
-                # if (((state['observation']['players'][0]['direction']) != (action_index - 1) and (action_index != 5))): 
-                #     sock_game.send(str.encode(action))
-                #     next_state = recv_socket_data(sock_game)
-                
-                # if len(next_state) == 0 or state['observation']['players'][0]['position'][0] < 0.3:
-                #     break 
-
-                # next_state = json.loads(next_state)
                 
                 # Count violations
                 if 'violations' in next_state and next_state['violations'] != '':
@@ -367,6 +330,7 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
 
                 has_basket, has_items, has_checkout = ar
 
+                # Checks if the agent has completed each substep
                 if has_basket >= 1 and has_basket_step == -1:
                     has_basket_step = cnt
                 if has_items > 0 and has_items_step == -1:
@@ -376,6 +340,7 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
 
                 state = next_state
 
+                # When the episode is finished
                 if cnt >= episode_length:
                     print("POSI", state['observation']['players'][0]['position'][0])
                     break
@@ -384,7 +349,8 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
             success = (has_basket_step != -1 and has_items_step != -1 and has_checkout_step != -1)
             successes.append(1 if success else 0)
             steps_list.append(cnt)
-            
+
+            # Get the final position of the agent
             final_pos = state['observation']['players'][0]['position']
             
             # Log this episode
@@ -426,37 +392,30 @@ def evaluate_primed_qtables_from_demos(sock_game, priming_value):
         print(f"Violation Rate: {violation_rate_eval:.4f}")
         print("=" * 40 + "\n")      
     
-# # Connect to Supermarket
-# HOST = '127.0.0.1'
-# PORT = 1972
-# sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# sock_game.connect((HOST, PORT))
-# # execute    
-# prime_from_demos(sock_game)
-# evaluate_primed_qtables_from_demos(sock_game)
-# sock_game.close()
-# # TODO get metrics and plot nicely in some way
-        
-# Connect to Supermarket
-HOST = '127.0.0.1'
-PORT = 1972
-sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock_game.connect((HOST, PORT))
+def main():
+    # Connect to Supermarket
+    HOST = '127.0.0.1'
+    PORT = 1972
+    sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock_game.connect((HOST, PORT))
 
-# Initialize CSV files
-initialize_csv_files()
+    # Initialize CSV files
+    initialize_csv_files()
 
-# Execute pipeline
-for priming_value in [10, 20, 30]:
-    prime_from_demos(sock_game, priming_value)
-    evaluate_primed_qtables_from_demos(sock_game, priming_value)
+    # Run pipeline for each priming value
+    for priming_value in [10, 20, 30]:
+        prime_from_demos(sock_game, priming_value) # prime the qtables
+        evaluate_primed_qtables_from_demos(sock_game, priming_value) # evaluate the agent running on the primed qtables
 
-sock_game.close()
+    sock_game.close() # closes the socket when finished
 
-print("Check the CSV files for results:")
-print("  - demo_priming_metrics.csv")
-print("  - evaluation_results.csv")
-print("  - summary_statistics.csv")
+    print("Check the CSV files for results:")
+    print("  - demo_priming_metrics.csv")
+    print("  - evaluation_results.csv")
+    print("  - summary_statistics.csv")
+
+if __name__ == "__main__":
+    main()
         
 
 

@@ -1,3 +1,8 @@
+'''
+After running GAIL, this file shows the agent using the N policies trained with the GAIl algorithm.
+This file runs through each checkpoint. Make sure your checkpoint parameters are the same as in the GAIL training algorithm.
+'''
+
 import torch
 import torch.nn as nn
 import torch.optim as optim

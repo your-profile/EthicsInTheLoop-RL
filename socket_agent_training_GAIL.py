@@ -1,3 +1,10 @@
+'''
+GAIL Implementation:
+GAIL algorithm +
+Checkpoint analysis and sorting code +
+Demonstration allocation by checkpoint.
+'''
+
 import torch
 import torch.nn as nn
 import torch.optim as optim

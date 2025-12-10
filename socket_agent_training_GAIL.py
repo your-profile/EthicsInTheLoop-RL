@@ -5,16 +5,16 @@ import numpy as np
 import argparse
 import os
 import json
-import random
 import socket
-import gymnasium as gym
-from env import SupermarketEnv
 from utils import recv_socket_data
-from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent class
 import pickle
-import pandas as pd
 import itertools
 import math
+import argparse
+import socket
+import pickle
+import os
+import numpy as np
 
 granularity = 4.0
 HEIGHT = int(26*granularity)
@@ -25,8 +25,8 @@ class Generator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim,64), nn.ReLU(),
-            nn.Linear(64,64), nn.ReLU(),
+            nn.Linear(obs_dim,64), nn.ELU(),
+            nn.Linear(64,64), nn.ELU(),
             nn.Linear(64,act_dim),
         )
 
@@ -46,8 +46,8 @@ class Discriminator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim+act_dim,64), nn.ReLU(),
-            nn.Linear(64,64), nn.ReLU(),
+            nn.Linear(obs_dim+act_dim,64), nn.ELU(),
+            nn.Linear(64,64), nn.ELU(),
             nn.Linear(64,1),
             nn.Sigmoid(),)
 
@@ -153,7 +153,6 @@ def split_demonstrations(dictionary, checkpoints, radius = 30):
         for (state, action) in zip(states[1:], dictionary[i]['actions']):
             state_array = state_to_obs(state)
             key = find_checkpoint_for_state(state_array, checkpoints, radius=radius)
-            # print(key, state_array)
             expert[key]['obs'].append(state_array)
             expert[key]['actions'].append(action)
     
@@ -201,7 +200,6 @@ def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
                     if (cx - dist) < x < (cx + dist) and (cy - dist) < y < (cy + dist):
                         near_any = True
                         if cell_value > old_value:
-                            # print(f"{top_checkpoints[i]} | {vector}")
                             top_checkpoints[i] = vector
                             replaced = True
                         break
@@ -233,10 +231,6 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
     for i in range(steps):
         key = find_checkpoint_for_state(obs, checkpoints)
 
-        # print(key)
-        # print(checkpoints[key])
-
-        # print("POLICY KEY: ", key)
         try:
             action_index, _ = policies[key]['policy'].choose_action(obs)
         except:
@@ -270,16 +264,13 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
             state = recv_socket_data(sock_game)
             state = json.loads(state)
             obs = state_to_obs(state)
-            # obs_dict[key] = np.array(obs_list[key])
-            # action_dict[key] = np.array(action_list[key])
 
         last_key = key
 
     return obs_dict, action_dict
 
 # traininf loop
-def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGail", disc_lr = 3e-4, gen_lr = 2e-4):
-    #TODO: hard code obs space size and action space size
+def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGail", disc_lr = 1e-3, gen_lr = 1e-3):
     obs_dim = 5
     act_dim = 7
 
@@ -301,7 +292,8 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
         policies[key]["opt_discr"] = optim.Adam(policies[key]["disc"].parameters(), lr=disc_lr)
 
         expert_obs_array_x = expert_dict[key]['obs']
-        expert_obs_t_x = torch.tensor(expert_obs_array_x, dtype=torch.float32)
+        expert_obs_array_x = np.array(expert_obs_array_x, dtype=np.float32)
+        expert_obs_t_x = torch.from_numpy(expert_obs_array_x)
 
         expert_obs[key]['obs'] = expert_obs_t_x
 
@@ -322,18 +314,9 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
         for key in policy_obs.keys():
 
             policy_obs_tensor = torch.tensor(policy_obs[key], dtype=torch.float32)
-        
-            # policy_action_onehot = torch.tensor([one_hot(a, act_dim) for a in policy_actions], dtype=torch.float32)
             policy_action_onehot_array = np.array([one_hot(a, act_dim) for a in policy_actions[key]])
             policy_action_onehot = torch.tensor(policy_action_onehot_array, dtype=torch.float32)
             policy_action_tensor = torch.tensor(policy_actions[key], dtype=torch.long)
-
-
-            # print("Obs - Key: ", key, policy_obs_tensor)
-            # print("Action OneHot Array - Key: ", key, policy_action_onehot_array)
-            # print("Action OneHot - Key: ", key, policy_action_onehot)
-            # print("Action Tensor - Key: ", key, policy_action_tensor)
-            # input()
 
             discriminator_expert = policies[key]["disc"](expert_obs[key]['obs'], expert_obs[key]['actions'])
             discriminator_policy = policies[key]["disc"](policy_obs_tensor, policy_action_onehot)
@@ -350,8 +333,8 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
                 rewards = -torch.log(1 - policies[key]["disc"](policy_obs_tensor, policy_action_onehot) + 1e-8)
 
             log_probs = []
-            # update policy (PPO)
 
+            # update policy (PPO)
             for i in range(len(policy_obs[key])):
                 logits = policies[key]["policy"](torch.tensor(policy_obs[key][i], dtype=torch.float32))
                 dist = torch.distributions.Categorical(logits=logits)
@@ -384,16 +367,6 @@ def read_demos(demo_filename=None):
 
     return demo_dict
 
-# def find_key(state):
-#     if len(state) == 7:
-#         _, _, _, f, t, o, _ = state
-    
-#     if len(state) == 5:
-#         _, _, f, t, o = state
-    
-#     return 4*f + 2*t + 1*o
-
-# ordering of the binary groups
 group_order = {
     (0,0,0): 0,
     (0,1,1): 0,
@@ -417,45 +390,66 @@ def sort_key(entry):
         # descending vector
         return (group_index, -idx)
 
-# main
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--radius", type=int, default=45,
+                        help="radius for matching demos to checkpoints")
+    parser.add_argument("--dist", type=int, default=5,
+                        help="distance threshold for calculating checkpoints")
+    parser.add_argument("--n", type=int, default=6,
+                        help="number of checkpoints to extract from primed Q-table")
+    parser.add_argument("--qtable", type=str, default="primed_qtable_20G.pkl",
+                        help="path to primed qtable file")
+    parser.add_argument("--iterations", type=int, default=800,
+                        help="number of GAIL training iterations")
+
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
-    # Initialize Q-learning agent
-    action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
-    
-    with open('primed_qtable_20G.pkl', 'rb') as file:
-        primed_qtable = pickle.load(file)
+    action_space = len(action_commands) - 1
 
-    checkpoints = calculate_checkpoints_from_primeQ(primed_qtable, n = 9, dist = 10)
+    with open(args.qtable, 'rb') as f:
+        primed_qtable = pickle.load(f)
 
-    # Connect to Supermarket
+    checkpoints = calculate_checkpoints_from_primeQ(
+        primed_qtable,
+        n=args.n,
+        dist=args.dist
+    )
+
     HOST = '127.0.0.1'
     PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
-
-    '''
-    TODO: Identify states from Q priming that are checkpoints. is_episode_over should recieve this checkpoint in feature vector form
-    TODO: Then do IRL for each checkpoint and save them
-    TODO: Use these reward functions for basline Q learning, but make sure to switch reward functions at each checkpoint
-    '''
 
     pid = input("Input the Participant ID: ")
     pid = f"{pid}_Demonstration"
 
     demonstration_dict = read_demos(pid)
 
-    # Then separate these observations and actions
     sorted_checkpoints = sorted(checkpoints, key=sort_key)
-
     print(sorted_checkpoints)
 
-    expert_dict = split_demonstrations(demonstration_dict, sorted_checkpoints, radius=60)
+    expert_dict = split_demonstrations(
+        demonstration_dict,
+        sorted_checkpoints,
+        radius=args.radius
+    )
 
-    # np.save(os.path.join("outputGail", f"expert_obs.npy"), expert_obs, allow_pickle=True)
-    # np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions, allow_pickle=True)
+    policies = train_gail(
+        sock_game,
+        expert_dict,
+        iterations=args.iterations,
+        save_dir="outputGail",
+        checkpoints=sorted_checkpoints
+    )
 
-    policies = train_gail(sock_game, expert_dict, iterations=800, save_dir=f"outputGail", checkpoints=sorted_checkpoints)
 
 if __name__ == "__main__":
     main()

@@ -94,7 +94,7 @@ if __name__ == "__main__":
     sock_game.connect((HOST, PORT))
 
     model = Generator(5,7)
-    model.load_state_dict(torch.load("/Users/juliasantaniello/Desktop/EthicsInTheLoop-RL/outputGail/GAIL_generator_3.pth", map_location="cpu"))
+    model.load_state_dict(torch.load("/Users/juliasantaniello/Desktop/EthicsInTheLoop-RL/outputGail/GAIL_generator_1.pth", map_location="cpu"))
     model.eval()
 
     collect_policy_trajectories(sock_game=sock_game, policy=model)

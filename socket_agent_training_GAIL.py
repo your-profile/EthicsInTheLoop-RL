@@ -13,6 +13,8 @@ from utils import recv_socket_data
 from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent class
 import pickle
 import pandas as pd
+import itertools
+import math
 
 granularity = 4.0
 HEIGHT = int(26*granularity)
@@ -23,9 +25,9 @@ class Generator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim,32), nn.ReLU(),
-            nn.Linear(32,32), nn.ReLU(),
-            nn.Linear(32,act_dim),
+            nn.Linear(obs_dim,64), nn.ReLU(),
+            nn.Linear(64,64), nn.ReLU(),
+            nn.Linear(64,act_dim),
         )
 
     def forward(self, obs):
@@ -44,9 +46,9 @@ class Discriminator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim+act_dim,32), nn.ReLU(),
-            nn.Linear(32,32), nn.ReLU(),
-            nn.Linear(32,1),
+            nn.Linear(obs_dim+act_dim,64), nn.ReLU(),
+            nn.Linear(64,64), nn.ReLU(),
+            nn.Linear(64,1),
             nn.Sigmoid(),)
 
     def forward(self, obs, act_onehot):
@@ -98,6 +100,32 @@ def state_to_obs(state):
 
     return feature_vector
 
+def find_checkpoint_for_state(state, checkpoints, radius=15):
+    sx, sy, sb1, sb2, sb3 = state
+
+    best_idx = None
+    best_dist = float('inf')
+
+    for i, cp in enumerate(checkpoints):
+        _, cx, cy, cb1, cb2, cb3, _ = cp
+
+        # binary features must match exactly
+        if (sb1, sb2, sb3) != (cb1, cb2, cb3):
+            continue
+
+        # compute Euclidean distance
+        dist = math.sqrt((sx - cx)**2 + (sy - cy)**2)
+
+        # must be inside radius
+        if dist <= radius:
+            # keep the closest checkpoint
+            if dist < best_dist:
+                best_dist = dist
+                best_idx = i
+
+    return best_idx
+
+
 #takes demonstration dict and separates feature states and actions
 '''
 Toy example with three timesteps
@@ -110,45 +138,43 @@ expert_obs = [[x, y, 0, 1, 0] timestep 1 where (no items, has a cart, not checke
 
 expert_actions = [0,6,3]
 '''
-def split_demonstrations(dictionary):
-
-    binary_states = list(itertools.product([0,1], repeat=3))
+def split_demonstrations(dictionary, checkpoints, radius = 30):
 
     expert = {}
 
-    for key in range(len(binary_states)):
+    for key in range(len(checkpoints)):
         expert[key]= {}
         expert[key]["obs"] = []
         expert[key]["actions"] = []
 
 
-    for i in range (len(dictionary)):
+    for i in range(len(dictionary)):
         states = dictionary[i]['states']
         for (state, action) in zip(states[1:], dictionary[i]['actions']):
             state_array = state_to_obs(state)
-            _, _, f, t, o = state_array
-            key = 4*f + 2*t + 1*o
+            key = find_checkpoint_for_state(state_array, checkpoints, radius=radius)
+            # print(key, state_array)
             expert[key]['obs'].append(state_array)
             expert[key]['actions'].append(action)
-
-
-    
     
     for key in expert.keys():
         assert(len(expert[key]["obs"]) == len(expert[key]["actions"]))
+
+    
+    # print(expert)
     
     return expert
 
 # Checks if the observation matches the current checkpoint and returns true if it does. Otherwise returns false
-def is_episode_over(obs, checkpoint):
+def is_episode_over(state):
     
-    if np.array_equal(obs, checkpoint[1:6]):
+    if state['observation']['players'][0]['position'][0] < 0.3:
         return True
     else:
         return False
-import itertools
+    
 
-def calculate_checkpoints_from_primeQ(table, n=6):
+def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
     vector = [0, 0, 0, 0, 0, 0, 0]
     top_checkpoints = []
 
@@ -156,7 +182,7 @@ def calculate_checkpoints_from_primeQ(table, n=6):
     for i in range(n):
         top_checkpoints.append(vector)
 
-    binary_states = list(itertools.product([0,1], repeat=3))
+    binary_states = list(itertools.product([1,0], repeat=3))
 
     for cart, items, checkout in binary_states:
         for x in range(HEIGHT):
@@ -167,7 +193,6 @@ def calculate_checkpoints_from_primeQ(table, n=6):
                 cell_value = qvals.sum()
                 vector = [idx, x, y, cart, items, checkout, cell_value]
 
-                dist = 3
                 replaced = False
                 near_any = False
 
@@ -203,14 +228,22 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
     state = recv_socket_data(sock_game)
     state = json.loads(state)
     obs = state_to_obs(state)
+    last_key = 0
 
     for i in range(steps):
-        key = find_key(obs)
+        key = find_checkpoint_for_state(obs, checkpoints)
 
-
+        # print(key)
+        # print(checkpoints[key])
 
         # print("POLICY KEY: ", key)
-        action_index, _ = policies[key]['policy'].choose_action(obs)
+        try:
+            action_index, _ = policies[key]['policy'].choose_action(obs)
+        except:
+            key = last_key
+            action_index, _ = policies[key]['policy'].choose_action(obs)
+
+
         action = "0 " + action_commands[action_index]
 
         try:
@@ -229,7 +262,7 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
         state = json.loads(next_state)
 
         obs = state_to_obs(state)
-        done = is_episode_over(obs, checkpoints) # determines if an episode has ended from the obs vector
+        done = is_episode_over(state) # determines if an episode has ended from the obs vector
 
 
         if done or i > steps - 1:
@@ -237,10 +270,11 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
             state = recv_socket_data(sock_game)
             state = json.loads(state)
             obs = state_to_obs(state)
-            obs_dict[key] = np.array(obs_list[key])
-            action_dict[key] = np.array(action_list[key])
+            # obs_dict[key] = np.array(obs_list[key])
+            # action_dict[key] = np.array(action_list[key])
 
-    # print(len(obs_list))
+        last_key = key
+
     return obs_dict, action_dict
 
 # traininf loop
@@ -256,7 +290,6 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
 
 
     for key in expert_dict.keys():
-        # print(key)
         policies[key] = {}
         expert_obs[key] = {}
         expert_actions[key] = {}
@@ -278,12 +311,6 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
 
         expert_obs[key]['actions'] = expert_act_onehot_x
 
-    # discr = Discriminator(obs_dim, act_dim)
-    # opt_discr = optim.Adam(discr.parameters(), lr=disc_lr)
-
-
-    # print(policies)
-
 
     # create directory for results
     os.makedirs(save_dir, exist_ok=True)
@@ -291,7 +318,6 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
     for it in range(iterations):
         # policy rollouts
         policy_obs, policy_actions = collect_policy_trajectories(env, policies, checkpoints)
-        # print(policy_obs)
 
         for key in policy_obs.keys():
 
@@ -358,15 +384,38 @@ def read_demos(demo_filename=None):
 
     return demo_dict
 
-def find_key(state):
-    # print(state)
-    if len(state) == 7:
-        _, _, _, f, t, o, _ = state
+# def find_key(state):
+#     if len(state) == 7:
+#         _, _, _, f, t, o, _ = state
     
-    if len(state) == 5:
-        _, _, f, t, o = state
+#     if len(state) == 5:
+#         _, _, f, t, o = state
     
-    return 4*f + 2*t + 1*o
+#     return 4*f + 2*t + 1*o
+
+# ordering of the binary groups
+group_order = {
+    (0,0,0): 0,
+    (0,1,1): 0,
+    (0,0,1): 0,
+    (0,1,0): 0,
+    (1,0,0): 1,
+    (1,1,1): 1,
+    (1,1,0): 2,
+    (1,0,1): 3,
+}
+
+def sort_key(entry):
+    idx = entry[0]
+    group = (entry[3], entry[4], entry[5])
+    group_index = group_order[group]
+
+    if group == (0,0,0):
+        # ascending vector
+        return (group_index, idx)
+    else:
+        # descending vector
+        return (group_index, -idx)
 
 # main
 def main():
@@ -374,10 +423,10 @@ def main():
     # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
     
-    with open('primed_qtable_5G.pkl', 'rb') as file:
+    with open('primed_qtable_20G.pkl', 'rb') as file:
         primed_qtable = pickle.load(file)
 
-    checkpoints = calculate_checkpoints_from_primeQ(primed_qtable)
+    checkpoints = calculate_checkpoints_from_primeQ(primed_qtable, n = 9, dist = 10)
 
     # Connect to Supermarket
     HOST = '127.0.0.1'
@@ -396,22 +445,17 @@ def main():
 
     demonstration_dict = read_demos(pid)
 
-    #TODO: create a feature vector representation of our states
     # Then separate these observations and actions
+    sorted_checkpoints = sorted(checkpoints, key=sort_key)
 
-    expert_dict = split_demonstrations(demonstration_dict)
+    print(sorted_checkpoints)
+
+    expert_dict = split_demonstrations(demonstration_dict, sorted_checkpoints, radius=60)
 
     # np.save(os.path.join("outputGail", f"expert_obs.npy"), expert_obs, allow_pickle=True)
     # np.save(os.path.join("outputGail", f"expert_actions.npy"), expert_actions, allow_pickle=True)
 
-    policies = train_gail(sock_game, expert_dict, iterations=800, save_dir=f"outputGail", checkpoints=checkpoints)
-
-
-    # for i, checkpoint in enumerate(checkpoints):
-    #     print("Checkpoint: ", i)
-    #     _, _, _, f, t, o, _ = checkpoint
-    #     key = 4*f + t*2 + o*1
-    #     policy, discr = train_gail(sock_game, expert_dict[key]["obs"], expert_dict[key]["actions"], iterations=200, save_dir=f"outputGail_{i}", checkpoint=checkpoint, index=i)
+    policies = train_gail(sock_game, expert_dict, iterations=800, save_dir=f"outputGail", checkpoints=sorted_checkpoints)
 
 if __name__ == "__main__":
     main()

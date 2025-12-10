@@ -238,7 +238,7 @@ def prime_from_demos(sock_game):
                 if has_checkout > 0 and has_checkout_step == -1:
                     has_checkout_step = cnt
 
-                priming_value = 20
+                priming_value = 50
                 agent_prime.priming(action_index, priming_value, agent_prime.trans(state), agent_prime.trans(next_state))
                 state = next_state
 

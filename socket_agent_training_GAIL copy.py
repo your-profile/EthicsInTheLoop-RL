@@ -192,7 +192,7 @@ def calculate_checkpoints_from_primeQ(table, n=6):
 
 
 # policy rollout trajectory collection
-def collect_policy_trajectories(sock_game, policies, checkpoint, steps=800):
+def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     
     obs_dict, action_dict = {}, {}
@@ -229,7 +229,7 @@ def collect_policy_trajectories(sock_game, policies, checkpoint, steps=800):
         state = json.loads(next_state)
 
         obs = state_to_obs(state)
-        done = is_episode_over(obs, checkpoint) # determines if an episode has ended from the obs vector
+        done = is_episode_over(obs, checkpoints) # determines if an episode has ended from the obs vector
 
 
         if done or i > steps - 1:

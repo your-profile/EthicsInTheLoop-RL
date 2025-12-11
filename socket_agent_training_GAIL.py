@@ -32,8 +32,8 @@ class Generator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim,64), nn.ELU(),
-            nn.Linear(64,64), nn.ELU(),
+            nn.Linear(obs_dim,64), nn.ReLU(),
+            nn.Linear(64,64), nn.ReLU(),
             nn.Linear(64,act_dim),
         )
 
@@ -41,20 +41,22 @@ class Generator(nn.Module):
         logits = self.net(obs)
         return logits
 
-    def choose_action(self, obs):
+    def choose_action(self, obs, temperature=1.3):
         obs = torch.tensor(obs, dtype=torch.float32)
-        output = self.forward(obs)
-        dist = torch.distributions.Categorical(logits=output)
+        logits = self.forward(obs) / temperature
+        dist = torch.distributions.Categorical(logits=logits)
+
         action = dist.sample()
         return action.item(), dist.log_prob(action)
+
 
 # discriminating network (determines difference between expert and policy rollout)
 class Discriminator(nn.Module):
     def __init__(self, obs_dim, act_dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(obs_dim+act_dim,64), nn.ELU(),
-            nn.Linear(64,64), nn.ELU(),
+            nn.Linear(obs_dim+act_dim,64), nn.ReLU(),
+            nn.Linear(64,64), nn.ReLU(),
             nn.Linear(64,1),
             nn.Sigmoid(),)
 
@@ -160,6 +162,10 @@ def split_demonstrations(dictionary, checkpoints, radius = 30):
         for (state, action) in zip(states[1:], dictionary[i]['actions']):
             state_array = state_to_obs(state)
             key = find_checkpoint_for_state(state_array, checkpoints, radius=radius)
+
+            if key is None:
+                continue
+
             expert[key]['obs'].append(state_array)
             expert[key]['actions'].append(action)
     
@@ -222,7 +228,7 @@ def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
 
 
 # policy rollout trajectory collection
-def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
+def collect_policy_trajectories(sock_game, policies, checkpoints, steps=1000):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     
     obs_dict, action_dict = {}, {}
@@ -237,6 +243,8 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
 
     for i in range(steps):
         key = find_checkpoint_for_state(obs, checkpoints)
+        if key is None:
+            continue
 
         try:
             action_index, _ = policies[key]['policy'].choose_action(obs)
@@ -320,7 +328,10 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
 
         for key in policy_obs.keys():
 
-            policy_obs_tensor = torch.tensor(policy_obs[key], dtype=torch.float32)
+            # policy_obs_tensor = torch.tensor(policy_obs[key], dtype=torch.float32)
+            policy_obs_np = np.array(policy_obs[key], dtype=np.float32)
+            policy_obs_tensor = torch.from_numpy(policy_obs_np)
+
             policy_action_onehot_array = np.array([one_hot(a, act_dim) for a in policy_actions[key]])
             policy_action_onehot = torch.tensor(policy_action_onehot_array, dtype=torch.float32)
             policy_action_tensor = torch.tensor(policy_actions[key], dtype=torch.long)
@@ -401,15 +412,15 @@ def sort_key(entry):
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--radius", type=int, default=45,
+    parser.add_argument("--radius", type=int, default=15,
                         help="radius for matching demos to checkpoints")
     parser.add_argument("--dist", type=int, default=5,
                         help="distance threshold for calculating checkpoints")
-    parser.add_argument("--n", type=int, default=6,
+    parser.add_argument("--n", type=int, default=5,
                         help="number of checkpoints to extract from primed Q-table")
     parser.add_argument("--qtable", type=str, default="primed_qtable_20G.pkl",
                         help="path to primed qtable file")
-    parser.add_argument("--iterations", type=int, default=800,
+    parser.add_argument("--iterations", type=int, default=2000,
                         help="number of GAIL training iterations")
 
     return parser.parse_args()

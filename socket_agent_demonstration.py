@@ -1,6 +1,6 @@
 '''
 Saves expert dmeonstrations.
-Must click on the second Black Window in order for the keyboard to accept teleoperation.
+Must click on the second Black Window in order for the program to accept keyboard teleoperation.
 '''
 
 import json
@@ -70,6 +70,12 @@ def save_demo(demonstration_dict, demo_filename):
         pickle.dump(demonstration_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("saved as:", demo_filename)
 
+
+'''
+Demonstration saved in dictionary.
+States, actions, rewards, steps and other variables are saved at each step.
+Saved per epsiode.
+'''
 def save_demonstration(environment_name, steps, states, timestamps, actions, rewards, seed, environment_version):
         print(len(rewards), (len(states) - 1), len(actions), final_episode_steps)
         

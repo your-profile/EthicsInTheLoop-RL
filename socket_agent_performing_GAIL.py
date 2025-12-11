@@ -39,10 +39,11 @@ class Generator(nn.Module):
         logits = self.net(obs)
         return logits
 
-    def choose_action(self, obs):
+    def choose_action(self, obs, temperature=1.3):
         obs = torch.tensor(obs, dtype=torch.float32)
-        output = self.forward(obs)
-        dist = torch.distributions.Categorical(logits=output)
+        logits = self.forward(obs) / temperature
+        dist = torch.distributions.Categorical(logits=logits)
+
         action = dist.sample()
         return action.item(), dist.log_prob(action)
 
@@ -158,6 +159,8 @@ def split_demonstrations(dictionary, checkpoints, radius = 30):
         for (state, action) in zip(states[1:], dictionary[i]['actions']):
             state_array = state_to_obs(state)
             key = find_checkpoint_for_state(state_array, checkpoints, radius=radius)
+            if key is None:
+                continue
             # print(key, state_array)
             expert[key]['obs'].append(state_array)
             expert[key]['actions'].append(action)
@@ -222,7 +225,7 @@ def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
 
 
 # policy rollout trajectory collection
-def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
+def collect_policy_trajectories(sock_game, policies, checkpoints, steps=1000):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     
     models = {0: Generator(5,7),
@@ -244,6 +247,8 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=800):
 
     for i in range(steps):
         key = find_checkpoint_for_state(obs, checkpoints)
+        if key is None:
+            continue
         model = models[key]
 
         model.load_state_dict(torch.load(f"/Users/juliasantaniello/Desktop/EthicsInTheLoop-RL/outputGail/GAIL_generator_{key}.pth", map_location="cpu"))
@@ -312,7 +317,7 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
 
 
     # create directory for results
-    os.makedirs(save_dir, exist_ok=True)
+    # os.makedirs(save_dir, exist_ok=True)
 
     for it in range(iterations):
         policy_obs, policy_actions = collect_policy_trajectories(env, policies, checkpoints)
@@ -356,15 +361,15 @@ def sort_key(entry):
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--radius", type=int, default=40,
+    parser.add_argument("--radius", type=int, default=15,
                         help="radius for matching demos to checkpoints")
-    parser.add_argument("--dist", type=int, default=6,
+    parser.add_argument("--dist", type=int, default=5,
                         help="distance threshold for calculating checkpoints")
     parser.add_argument("--n", type=int, default=5,
                         help="number of checkpoints to extract from primed Q-table")
-    parser.add_argument("--qtable", type=str, default="primed_qtable_20G.pkl",
+    parser.add_argument("--qtable", type=str, default="primed_qtable_20B.pkl",
                         help="path to primed qtable file")
-    parser.add_argument("--iterations", type=int, default=800,
+    parser.add_argument("--iterations", type=int, default=1500,
                         help="number of GAIL training iterations")
 
     return parser.parse_args()
@@ -403,6 +408,9 @@ def main():
         sorted_checkpoints,
         radius=args.radius
     )
+
+    import time
+    time.sleep(2)
 
     policies = train_gail(
         sock_game,

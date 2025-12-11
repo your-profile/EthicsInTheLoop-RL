@@ -2,7 +2,7 @@
 GAIL Implementation:
 GAIL algorithm +
 Checkpoint analysis and sorting code +
-Demonstration allocation by checkpoint.
+Demonstration allocation by checkpoint (cp).
 '''
 
 import torch
@@ -40,7 +40,9 @@ class Generator(nn.Module):
     def forward(self, obs):
         logits = self.net(obs)
         return logits
+    
 
+    # choose action with some randomness using temperature
     def choose_action(self, obs, temperature=1.3):
         obs = torch.tensor(obs, dtype=torch.float32)
         logits = self.forward(obs) / temperature
@@ -72,26 +74,25 @@ def one_hot(a, act_dim):
 
 # Function that takes a proper shopper states and transforms it into a state feature vector
 def state_to_obs(state):
-
+    #shopping list
     shopping_list = set(state['observation']['players'][0]['shopping_list'])
     selected_items = []
     purchased_items = []
 
+    # if you have a basket, calculate how many items you have that are purchased and unpurchased
     if len(state['observation']['baskets']) > 0:
         basket_list = set(state['observation']['baskets'][0]['contents'])
         purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
         selected_items = shopping_list.difference(basket_list)
         purchased_items = shopping_list.difference(purchased_list)
 
-    # You should design a function to transform the huge state into a learnable state for the agent
-    # It should be simple but also contains enough information for the agent to learn
-    # print(state['observation']['players'][0]['position'])
+    #calculate features and position w/ granularity
     player_x = round(state['observation']['players'][0]['position'][0] * 4.0)
     player_y = round(state['observation']['players'][0]['position'][1] * 4.0)
     num_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
     num_items = int(len(list(selected_items)))
     num_checkout = int(len(list(purchased_items)))
-    player_direction = state['observation']['players'][0]['direction']
+    # player_direction = state['observation']['players'][0]['direction']
 
     has_items, has_basket, has_checkout = 0, 0, 0
 
@@ -110,19 +111,19 @@ def state_to_obs(state):
     return feature_vector
 
 def find_checkpoint_for_state(state, checkpoints, radius=15):
-    sx, sy, sb1, sb2, sb3 = state
+    sx, sy, sb1, sb2, sb3 = state #state stretched out
 
     best_idx = None
     best_dist = float('inf')
 
     for i, cp in enumerate(checkpoints):
-        _, cx, cy, cb1, cb2, cb3, _ = cp
+        _, cx, cy, cb1, cb2, cb3, _ = cp #checkpoint stretched out
 
         # binary features must match exactly
         if (sb1, sb2, sb3) != (cb1, cb2, cb3):
             continue
 
-        # compute Euclidean distance
+        # Euclidean distance
         dist = math.sqrt((sx - cx)**2 + (sy - cy)**2)
 
         # must be inside radius
@@ -132,7 +133,7 @@ def find_checkpoint_for_state(state, checkpoints, radius=15):
                 best_dist = dist
                 best_idx = i
 
-    return best_idx
+    return best_idx #return best policy/cp index
 
 
 #takes demonstration dict and separates feature states and actions
@@ -151,17 +152,21 @@ def split_demonstrations(dictionary, checkpoints, radius = 30):
 
     expert = {}
 
+    #create expert dictionary
     for key in range(len(checkpoints)):
         expert[key]= {}
         expert[key]["obs"] = []
         expert[key]["actions"] = []
 
-
+    # for each checkpoint add demos that "fit" that checkpoint
     for i in range(len(dictionary)):
+
         states = dictionary[i]['states']
+
+        # state and action pairs that will go to the discriminator for a particular cp
         for (state, action) in zip(states[1:], dictionary[i]['actions']):
             state_array = state_to_obs(state)
-            key = find_checkpoint_for_state(state_array, checkpoints, radius=radius)
+            key = find_checkpoint_for_state(state_array, checkpoints, radius=radius) #checkpoint estimated key
 
             if key is None:
                 continue
@@ -172,9 +177,6 @@ def split_demonstrations(dictionary, checkpoints, radius = 30):
     for key in expert.keys():
         assert(len(expert[key]["obs"]) == len(expert[key]["actions"]))
 
-    
-    # print(expert)
-    
     return expert
 
 # Checks if the observation matches the current checkpoint and returns true if it does. Otherwise returns false
@@ -185,7 +187,7 @@ def is_episode_over(state):
     else:
         return False
     
-
+# calculates top checkpoints from primed qtable
 def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
     vector = [0, 0, 0, 0, 0, 0, 0]
     top_checkpoints = []
@@ -194,15 +196,16 @@ def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
     for i in range(n):
         top_checkpoints.append(vector)
 
+    #run through the qtable by features and find top checkpoints
     binary_states = list(itertools.product([1,0], repeat=3))
 
     for cart, items, checkout in binary_states:
         for x in range(HEIGHT):
             for y in range(WIDTH):
 
-                idx = ((((x*HEIGHT + y)*2 + cart)*2 + items)*2 + checkout)
+                idx = ((((x*HEIGHT + y)*2 + cart)*2 + items)*2 + checkout) #index of x,y for a specific feature
                 qvals = table.loc[idx].values
-                cell_value = qvals.sum()
+                cell_value = qvals.sum() #sum of actions at that state
                 vector = [idx, x, y, cart, items, checkout, cell_value]
 
                 replaced = False
@@ -210,13 +213,15 @@ def calculate_checkpoints_from_primeQ(table, n=6, dist=5):
 
                 for i, item in enumerate(top_checkpoints):
                     _, cx, cy, _, _, _, old_value = item 
+
+                    #if not too close, and is higher than another checkpoint in the list, swap it
                     if (cx - dist) < x < (cx + dist) and (cy - dist) < y < (cy + dist):
                         near_any = True
                         if cell_value > old_value:
                             top_checkpoints[i] = vector
                             replaced = True
                         break
-
+                
                 if not replaced and not near_any:
                     lowest_index = min(range(len(top_checkpoints)),
                                     key=lambda j: top_checkpoints[j][-1])
@@ -232,7 +237,6 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=1000):
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
     
     obs_dict, action_dict = {}, {}
-    obs_list, action_list = [],[]
     done = False
 
     sock_game.send(str.encode("0 RESET"))  # reset the game
@@ -242,10 +246,14 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=1000):
     last_key = 0
 
     for i in range(steps):
+        # find which checkpoint we are in at some point in the generator rollout
         key = find_checkpoint_for_state(obs, checkpoints)
+
         if key is None:
             continue
 
+        # pull the generated rollout from the appropriate generator policy
+        # there is one for each checkpoint
         try:
             action_index, _ = policies[key]['policy'].choose_action(obs)
         except:
@@ -255,10 +263,11 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=1000):
 
         action = "0 " + action_commands[action_index]
 
+        # assign the generated rollout to the appropriate checkpoint dictionary
+        # So the right generator and discriminator are trained on the matching rollouts
         try:
             obs_dict[key].append(obs)
             action_dict[key].append(action_index)
-
         except:
             obs_dict[key] = []
             obs_dict[key].append(obs)
@@ -294,7 +303,7 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
     expert_obs = {}
     expert_actions = {}
 
-
+    # create one generator and discriminator for each policy
     for key in expert_dict.keys():
         policies[key] = {}
         expert_obs[key] = {}
@@ -325,10 +334,10 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
     for it in range(iterations):
         # policy rollouts
         policy_obs, policy_actions = collect_policy_trajectories(env, policies, checkpoints)
-
+        
+        # train each generator and discriminator individually
         for key in policy_obs.keys():
 
-            # policy_obs_tensor = torch.tensor(policy_obs[key], dtype=torch.float32)
             policy_obs_np = np.array(policy_obs[key], dtype=np.float32)
             policy_obs_tensor = torch.from_numpy(policy_obs_np)
 
@@ -342,6 +351,7 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
             loss_expert = torch.mean(torch.log(discriminator_expert + 1e-8))
             loss_policy = torch.mean(torch.log(1 - discriminator_policy + 1e-8))
             discr_loss = -(loss_expert + loss_policy)
+
             policies[key]["opt_discr"].zero_grad()
             discr_loss.backward()
             policies[key]["opt_discr"].step()
@@ -352,7 +362,7 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
 
             log_probs = []
 
-            # update policy (PPO)
+            # update policy
             for i in range(len(policy_obs[key])):
                 logits = policies[key]["policy"](torch.tensor(policy_obs[key][i], dtype=torch.float32))
                 dist = torch.distributions.Categorical(logits=logits)
@@ -369,7 +379,7 @@ def train_gail(env, expert_dict, checkpoints, iterations=200, save_dir="outputGa
             if it % 25 == 0:
                 print(f"Iteration {it} | Key {key} | Discriminator Loss: {discr_loss.item():.3f} | Generator Loss: {policy_loss.item():.3f}")
 
-            # saving outputs
+            # saving individual checkppoint generators and discriminators
             torch.save(policies[key]["policy"].state_dict(), os.path.join(save_dir, f"GAIL_generator_{key}.pth"))
             torch.save(policies[key]["disc"].state_dict(), os.path.join(save_dir, f"GAIL_discriminator_{key}.pth"))
     
@@ -385,8 +395,9 @@ def read_demos(demo_filename=None):
 
     return demo_dict
 
+#order of checkpoint features for sorting purposes
 group_order = {
-    (0,0,0): 0,
+    (0,0,0): 0, #order and direction
     (0,1,1): 0,
     (0,0,1): 0,
     (0,1,0): 0,
@@ -396,6 +407,7 @@ group_order = {
     (1,0,1): 3,
 }
 
+#sorts checkpoints
 def sort_key(entry):
     idx = entry[0]
     group = (entry[3], entry[4], entry[5])
@@ -408,7 +420,7 @@ def sort_key(entry):
         # descending vector
         return (group_index, -idx)
 
-
+#arguments
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -433,26 +445,27 @@ def main():
     action_space = len(action_commands) - 1
 
     with open(args.qtable, 'rb') as f:
-        primed_qtable = pickle.load(f)
+        primed_qtable = pickle.load(f) #load primed qtable
 
+    #calculate checkpoints
     checkpoints = calculate_checkpoints_from_primeQ(
         primed_qtable,
         n=args.n,
         dist=args.dist
     )
+    sorted_checkpoints = sorted(checkpoints, key=sort_key)
+    print(sorted_checkpoints)
 
+    # set up env
     HOST = '127.0.0.1'
     PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
 
+    #Demo PID
     pid = input("Input the Participant ID: ")
     pid = f"{pid}_Demonstration"
-
     demonstration_dict = read_demos(pid)
-
-    sorted_checkpoints = sorted(checkpoints, key=sort_key)
-    print(sorted_checkpoints)
 
     expert_dict = split_demonstrations(
         demonstration_dict,
@@ -460,6 +473,7 @@ def main():
         radius=args.radius
     )
 
+    #train gail
     policies = train_gail(
         sock_game,
         expert_dict,

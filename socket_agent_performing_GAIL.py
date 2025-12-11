@@ -1,5 +1,6 @@
 '''
-After running GAIL, this file shows the agent using the N policies trained with the GAIl algorithm.
+*** SEE socket_agent_training_GAIL.py for descriptive comments. This is a performing file***
+After running GAIL, this file shows the agent using the N policies trained with the GAIL algorithm.
 This file runs through each checkpoint. Make sure your checkpoint parameters are the same as in the GAIL training algorithm.
 '''
 
@@ -39,6 +40,7 @@ class Generator(nn.Module):
         logits = self.net(obs)
         return logits
 
+    # choose action with some randomness using temperature
     def choose_action(self, obs, temperature=1.3):
         obs = torch.tensor(obs, dtype=torch.float32)
         logits = self.forward(obs) / temperature
@@ -80,9 +82,6 @@ def state_to_obs(state):
         selected_items = shopping_list.difference(basket_list)
         purchased_items = shopping_list.difference(purchased_list)
 
-    # You should design a function to transform the huge state into a learnable state for the agent
-    # It should be simple but also contains enough information for the agent to learn
-    # print(state['observation']['players'][0]['position'])
     player_x = round(state['observation']['players'][0]['position'][0] * 4.0)
     player_y = round(state['observation']['players'][0]['position'][1] * 4.0)
     num_basket = int(state['observation']['players'][0]['curr_basket'] + 1)

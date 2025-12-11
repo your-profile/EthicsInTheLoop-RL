@@ -43,3 +43,16 @@ To View Stitched Policies Trained with GAIL:
 python socket_agent_performing_GAIL.py
 ```
 
+#### Running Experiments
+
+```
+python run_pipeline.py
+```
+
+Then run all cells in 
+```
+AA_graphs.ipynb
+```
+
+There is a propper shopper bug that freezes learning if the agent leaves with a cart. In that case, please rerun the experiment.
+

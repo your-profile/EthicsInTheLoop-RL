@@ -12,7 +12,12 @@ from Q_learning_agent_prime import QLAgent  # Make sure to import your QLAgent c
 import pickle
 import pandas as pd
 
+'''
+Reads saved demonstrations from pickle file.
 
+Input: Filename
+Output: Saved Demo Dictionary
+'''
 def read_demos(demo_filename=None):
 
     file = open('./data/{}.pickle'.format(demo_filename), 'rb')
@@ -22,11 +27,10 @@ def read_demos(demo_filename=None):
     return demo_dict
 
 if __name__ == "__main__":
-    
-
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
+
     # Initialize Q-learning agent
-    action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
+    action_space = len(action_commands) - 1 
     agent = QLAgent(action_space)
     
     # Connect to Supermarket
@@ -34,10 +38,11 @@ if __name__ == "__main__":
     PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
+
+    # Demo PID
     pid = input("Input the Participant ID: ")
     pid = f"{pid}_Demonstration"
     
-    training_time = 2
     episode_length = 1000
 
     demonstration_dict = read_demos(pid)

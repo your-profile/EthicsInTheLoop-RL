@@ -14,41 +14,67 @@ import pickle
 import pandas as pd
 import pygame
 
-cart = False
-exit_pos = [-0.8, 15.6] # The position of the exit in the environment from [-0.8, 15.6] in x, and y = 15.6
-cart_pos_left = [1, 18.5] # The position of the cart in the environment from [1, 2] in x, and y = 18.5
-cart_pos_right = [2, 18.5] 
-
-def distance_to_cart(state):
-    agent_position = state['observation']['players'][0]['position']
-    if agent_position[0] > 1.5:
-        cart_distances = [euclidean_distance(agent_position, cart_pos_right)]
-    else:
-        cart_distances = [euclidean_distance(agent_position, cart_pos_left)]
-    return min(cart_distances)
-
-def euclidean_distance(pos1, pos2):
-    # Calculate Euclidean distance between two points
-    return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)**0.5
-
-
-def calculate_reward(previous_state, current_state):
-    return 0
-
-
 pygame.init()
 red = (255, 0, 0)
 green = (0, 255, 0)
 
+'''
+Simple Reward Function
+
+Input: State, Next_State
+Output: Reward
+'''
+def calculate_reward(previous_state, state):
+
+    # Shopping List
+    shopping_list = set(state['observation']['players'][0]['shopping_list'])
+
+    #Unpurchased, selected items
+    selected_items = []
+
+    #purchsed items
+    purchased_items = []
+
+    # if you have a basket, calculate how many items you have that are purchased and unpurchased
+    if len(state['observation']['baskets']) > 0:
+        basket_list = set(state['observation']['baskets'][0]['contents'])
+        purchased_list = set(state['observation']['baskets'][0]['purchased_contents'])
+        selected_items = shopping_list.difference(basket_list)
+        purchased_items = shopping_list.difference(purchased_list)
+
+
+    # features for winning
+    has_basket = int(state['observation']['players'][0]['curr_basket'] + 1)
+    has_items = int(len(list(selected_items)))
+    has_checkout = int(len(list(purchased_items)))
+
+    if has_basket >= 1 and has_items == 0 and has_checkout == 0 and state['observation']['players'][0]['position'][0] < 0.3:
+        return 100
+
+    if state['observation']['players'][0]['position'][0] < 0.3:
+        return -10
+    
+    return -1
+
+'''
+Allows for teleoperation of the propper shopper agent.
+**MUST SELECT THE SECOND, BLANK WINDOW TO ALLOW KEYBOARD TO INFLUENCE AGENT**
+
+Output: Human Action from Keyboard
+'''
 def choose_human_action():
+
     while True:
+        #get event
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 raise SystemExit
 
+        #get all pressed keys
         keys = pygame.key.get_pressed()
 
+        # return action based on keyboard mapping
         if keys[pygame.K_UP]:
             return 1
         elif keys[pygame.K_LEFT]:
@@ -63,8 +89,10 @@ def choose_human_action():
             return 5
 
 
-        # pygame.time.wait(10)
-
+'''
+Saves demonstration
+Input: Demo Dictionary and Filename
+'''
 def save_demo(demonstration_dict, demo_filename):
     with open('./data/{}.pickle'.format(demo_filename), 'wb') as handle:
         pickle.dump(demonstration_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -75,6 +103,8 @@ def save_demo(demonstration_dict, demo_filename):
 Demonstration saved in dictionary.
 States, actions, rewards, steps and other variables are saved at each step.
 Saved per epsiode.
+
+Output: Dictionary for an episode/trajectory
 '''
 def save_demonstration(environment_name, steps, states, timestamps, actions, rewards, seed, environment_version):
         print(len(rewards), (len(states) - 1), len(actions), final_episode_steps)
@@ -98,34 +128,34 @@ if __name__ == "__main__":
     
 
     action_commands = ['NOP', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'TOGGLE_CART', 'INTERACT', 'RESET']
-    # Initialize Q-learning agent
     action_space = len(action_commands) - 1   # Assuming your action space size is equal to the number of action commands
-    agent = QLAgent(action_space)
-
-####################
-    #Once you have your agent trained, or you want to continue training from a previous training session, you can load the qtable from a json file
-    #agent.qtable = pd.read_json('qtable.json')
-####################
     
+    # Q learning agent
+    agent = QLAgent(action_space)
     
     # Connect to Supermarket
     HOST = '127.0.0.1'
     PORT = 1972
     sock_game = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock_game.connect((HOST, PORT))
+
+    # participant/demo ID
     pid = input("Input the Participant ID: ")
     pid = f"{pid}_Demonstration"
     
+    #Pygame screen
     screen = pygame.display.set_mode((400, 200))
     pygame.display.set_caption("Supermarket Control Here")
     screen.fill(red)
-
-
-    training_time = 20
-    episode_length = 1000
-    demonstration_dict = {}
     pygame.time.wait(5000)
     screen.fill(green)
+
+
+    # training time and step length
+    training_time = 20
+    episode_length = 1000
+
+    demonstration_dict = {}
     end = 0
 
     for i in range(training_time):
@@ -133,16 +163,15 @@ if __name__ == "__main__":
 
         sock_game.send(str.encode("0 RESET"))  # reset the game
         state = recv_socket_data(sock_game)
-        print(state)
         state = json.loads(state)
-        cnt = 0
-
         final_episode_states.append(state)
 
+        cnt = 0
 
         while not state['gameOver']:
             cnt += 1
             pygame.time.wait(10)
+
             # Choose an action based on the current state
             action_index = choose_human_action()
             print("Chosen Action: ", action_index)
@@ -189,9 +218,6 @@ if __name__ == "__main__":
 
         episode = save_demonstration(environment_name="properShopper", steps = cnt, states=final_episode_states, timestamps=None, actions=final_episode_actions, rewards=final_episode_rewards, seed=None, environment_version=None)
         demonstration_dict[i] = episode
-
-
-        # Additional code for end of episode if needed
 
     # Close socket connection
     save_demo(demonstration_dict, pid)

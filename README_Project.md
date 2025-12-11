@@ -6,6 +6,9 @@ Angel Shen
 Matt
 Manik
 
+### Overview
+This repository includes code for collecting demonstrations, training an agent using Q-Priming, GAIL and running computational experiments. Plotting is available in the AA_graphs.ipynb Jupyter Notebook.
+
 ### To Run
 #### Demonstrations
 To Collect Demonstrations:

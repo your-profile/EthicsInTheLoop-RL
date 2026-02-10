@@ -252,6 +252,9 @@ def collect_policy_trajectories(sock_game, policies, checkpoints, steps=1000):
         if key is None:
             continue
 
+        if key != last_key:
+            i = 0
+
         # pull the generated rollout from the appropriate generator policy
         # there is one for each checkpoint
         try:
@@ -428,7 +431,7 @@ def parse_args():
                         help="radius for matching demos to checkpoints")
     parser.add_argument("--dist", type=int, default=5,
                         help="distance threshold for calculating checkpoints")
-    parser.add_argument("--n", type=int, default=5,
+    parser.add_argument("--n", type=int, default=7,
                         help="number of checkpoints to extract from primed Q-table")
     parser.add_argument("--qtable", type=str, default="primed_qtable_20G.pkl",
                         help="path to primed qtable file")
